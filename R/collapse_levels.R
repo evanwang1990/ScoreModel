@@ -1,58 +1,17 @@
-freqMatrix <- function(x, y, levels)
+collapseNames <- function(names, i, j)
 {
-  if(any(is.na(y))) stop("Target must not have NAs!\n")
-  if(any(is.na(x)))
-  {
-    nas <- is.na(x)
-    x <- x[!nas]
-    y <- y[!nas]
-  }
-
-  if(is.numeric(x)) x <- cut(rank(x, ties.method = 'min'), breaks = levels, labels = F)
-
-  freqMatrix <- matrix(table(x, y), ncol = length(unique(y)), dimnames = NULL)
-  probMatrix <- apply(freqMatrix, 2, function(x) x/sum(x))
-  return(list(freqMatrix = freqMatrix,
-              probMatrix = probMatrix,
-              is.ordered = is.numeric(x) || is.ordered(x),
-              has.zero = any(freqMatrix == 0)))
+  names[i] <- paste0(names[c(i, j)], collapse = '+')
+  names[-j]
 }
 
-getIV <- function(freqMatrix)
+collapseLevel <- function(x,                                # independent variable
+                          y,                                # target
+                          levels,                           # initial levels
+                          method = c('iv', 'll', 'mo'),     # collapse methods
+                          mode = 'J',                       # collapse mode
+                          do.trace = T)                     # need output collapsing step?
 {
-  if(freqMatrix$has.zero) stop("there are some zero cells!\n")
-
-  probMatrix <- freqMatrix$probMatrix
-
-  iv <- sum((probMatrix[,1] - probMatrix[,2]) * (log(probMatrix[,1]) - log(probMatrix[,2])))
-  iv
-}
-
-getCstat <- function(freqMatrix)
-{
-  if(!freqMatrix$is.ordered) return(NULL)
-
-  probMatrix <- freqMatrix$probMatrix
-  c_stat <- cal_c_stat(probMatrix[,1], probMatrix[,2])
-  c_stat
-}
-
-getXstat <- function(freqMatrix)
-{
-  if(!freqMatrix$is.ordered) return(NULL)
-
-  probMatrix <- freqMatrix$probMatrix
-  x_stat <- cal_x_stat(probMatrix[,1], probMatrix[,2])
-  x_stat
-}
-
-collapseLevel <- function(x,
-                          y,
-                          levels,
-                          method = c('iv', 'll'),
-                          mode = c('A', 'J'),
-                          do.trace = F)
-{
+  # deal with NAs
   if(any(is.na(y))) stop("There are NAs in target variable!\n")
   if(any(is.na(x)))
   {
@@ -61,12 +20,28 @@ collapseLevel <- function(x,
     y <- y[!nas]
   }
 
+  # deal with `method` and `mode`
+  method <- match.arg(method)
+  if(is.character(x) || (is.factor(x) && !is.ordered(x)))
+  {
+    if(method == 'mo')
+    {
+      warning("Independent variable is character vector or unordered vector, 'mo' method is not appreciate\n The method is modified into 'iv' automatically.")
+      method <- 'iv'
+    }
+    mode <- 'A'
+  }
+
   if(is.numeric(x)) x <- cut(rank(x, ties.method = 'min'), breaks = levels, labels = F)
 
   freqMatrix <- as.matrix(table(x, y))
+  # check if there are zeros in cells
   if(any(freqMatrix == 0)) stop("There are zero cells!\n")
+  #check nrow
 
-  probMatrix <- apply(freqMatrix, 2, function(x) x/sum(x))
+
+  res <- collapse(freqMatrix, method, mode)
+
 
 
 

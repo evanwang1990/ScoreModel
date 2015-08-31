@@ -97,6 +97,20 @@ NumericMatrix combine(NumericMatrix freqMatrix, int i, int j)
 }
 
 //[[Rcpp::export]]
+StringVector combineNames(StringVector names, int i, int j)
+{
+  names = clone(names);
+  names[i] += "+";
+  names[i] += names[j];
+  for(int n = j + 1; n < names.size(); n ++)
+  {
+    names[n - 1] = names[n];
+  }
+  names[names.size() - 1] = " ";
+  return(names);
+}
+
+//[[Rcpp::export]]
 double delta(NumericVector good, NumericVector bad, int i, int j, String method = "iv")
 {
   double delta_;
@@ -300,7 +314,6 @@ NumericMatrix collapse(NumericMatrix freqMatrix, String method = "iv", String mo
     {
       //calculate max binary split iv
       double max_binary_iv = binary_split(freqMatrix);
-      cout<<max_binary_iv<<endl;
       trace(i,9) = (max_binary_iv - trace(i,2)) / max_binary_iv * 100;
     }
     sub_collapse_result = sub_collapse(freqMatrix_, method, mode);

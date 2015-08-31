@@ -37,7 +37,7 @@ inline double cal_x_stat(NumericVector good, NumericVector bad)
 }
 
 //[[Rcpp::export]]
-double cal_iv(NumericVector good, NumericVector bad)
+inline double cal_iv(NumericVector good, NumericVector bad)
 {
   double iv = 0;
   size_t n = good.size();
@@ -73,7 +73,7 @@ inline double cal_log_odds_ratio_zscore(NumericVector good, NumericVector bad, i
 }
 
 //[[Rcpp::export]]
-inline NumericMatrix combine(NumericMatrix freqMatrix, int i, int j)
+NumericMatrix combine(NumericMatrix freqMatrix, int i, int j)
 {
   size_t nr = freqMatrix.nrow();
   size_t nc = freqMatrix.ncol();
@@ -119,6 +119,10 @@ double delta(NumericVector good, NumericVector bad, int i, int j, String method 
   // make sure that only numeric x can use "mo" method!!
   else if(method == "mo")
   {
+    double lo_zscore = cal_log_odds_ratio_zscore(good, bad, i, j);
+    //under the condition that the two levels can be collapsed
+    //we find the min adjust_lift(x_stat vs c_stat)
+    if(abs(lo_zscore) > 1.64) return(9999.0);
     int n = good.size() - 1;
     NumericVector new_good(n);
     NumericVector new_bad(n);
@@ -126,7 +130,7 @@ double delta(NumericVector good, NumericVector bad, int i, int j, String method 
     {
       if(k == i)
       {
-        new_good[k] = good[i] + bad[j];
+        new_good[k] = good[i] + good[j];
         new_bad[k]  = bad[i] + bad[j];
       }
       else if(k <= j)
@@ -140,11 +144,12 @@ double delta(NumericVector good, NumericVector bad, int i, int j, String method 
         new_bad[k] = bad[k + 1];
       }
     }
-
     new_good = new_good / sum(new_good);
     new_bad = new_bad / sum(new_bad);
-
-    delta_ = cal_x_stat(new_good, new_bad) - cal_c_stat(new_good, new_bad);
+    double c_stat = cal_c_stat(new_good, new_bad);
+    delta_ = (cal_x_stat(new_good, new_bad) - c_stat) / c_stat;
+    //if x_stat == c_stat then use vi maximum method
+    if(delta_ <= 10e-6) return(9999.0);
   }
 
   return(delta_);
@@ -166,6 +171,7 @@ List sub_collapse(NumericMatrix freqMatrix, String method = "iv", String mode = 
     for(size_t i = 0; i < n - 1; ++i)
     {
       delta_ = delta(good, bad, i, i + 1, method);
+      if(delta_ == 9999.0) return(sub_collapse(freqMatrix));
       if(delta_ < min_delta)
       {
         min_delta = delta_;
@@ -217,11 +223,43 @@ List sub_collapse(NumericMatrix freqMatrix, String method = "iv", String mode = 
 }
 
 //[[Rcpp::export]]
+double binary_split(NumericMatrix freqMatrix)
+{
+  NumericVector good = wrap(freqMatrix.column(0));
+  NumericVector bad = wrap(freqMatrix.column(1));
+  size_t nr = freqMatrix.nrow();
+  double max_iv = R_NegInf;
+  double iv;
+  for(size_t i = 1; i < nr - 1; ++i)
+  {
+    double good1 = 0; double good2 = 0; double bad1 = 0; double bad2 = 0;
+    for(size_t j = 0; j < nr - 1; ++j)
+    {
+      if(j < i)
+      {
+        good1 += good[j];
+        bad1 += bad[j];
+      }
+      else
+      {
+        good2 += good[j];
+        bad2 += bad[j];
+      }
+    }
+
+    iv = (good1/(good1 + good2) - bad1/(bad1 + bad2)) * (log(good1/(good1 + good2)) - log(bad1/(bad1 + bad2))) +
+         (good2/(good1 + good2) - bad2/(bad1 + bad2)) * (log(good2/(good1 + good2)) - log(bad2/(bad1 + bad2)));
+    max_iv = max(max_iv, iv);
+  }
+  return(max_iv);
+}
+
+//[[Rcpp::export]]
 NumericMatrix collapse(NumericMatrix freqMatrix, String method = "iv", String mode = "J")
 {
   size_t nr = freqMatrix.nrow();
-  //the columns are:left, right, iv, x_stat, c_stat, adjust-lift, log likehood, likehood ratio chisq, log_odds ratio z_score
-  NumericMatrix trace(nr - 1, 9);
+  //the columns are:left, right, iv, x_stat, c_stat, adjust-lift, log likehood, likehood ratio chisq, log_odds ratio z_score, max binary split IV
+  NumericMatrix trace(nr - 1, 10);
   trace.fill(NA_REAL);
 
   //initialization
@@ -253,13 +291,25 @@ NumericMatrix collapse(NumericMatrix freqMatrix, String method = "iv", String mo
     if(mode == "J")
     {
       trace(i,4)  = sub_collapse_result["c_stat"];
-      //trace(i,5)  =
+      trace(i,5)  = (trace(i,3) - trace(i,4)) / (trace(i, 4) * (nr - i - 1));
     }
     trace(i,6)  = sub_collapse_result["ll"];
     trace(i,7)  = -2 * (trace(i,6) - ll0);
     trace(i,8)  = sub_collapse_result["lo_zscore"];
+    if(i == nr - 2)
+    {
+      //calculate max binary split iv
+      double max_binary_iv = binary_split(freqMatrix);
+      cout<<max_binary_iv<<endl;
+      trace(i,9) = (max_binary_iv - trace(i,2)) / max_binary_iv * 100;
+    }
     sub_collapse_result = sub_collapse(freqMatrix_, method, mode);
   }
 
   return(trace);
 }
+
+//test:
+//tmp <- sample(20:100, 10, replace = T)
+//tmp <- matrix(c(tmp, round(tmp * (seq(1, 3, length.out = 10) + 0.5 * runif(1:10)) + sample(1:10, 10))), ncol = 2)
+//plot(tmp[,2]/tmp[,1])

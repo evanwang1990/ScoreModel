@@ -96,10 +96,8 @@ NumericMatrix combine(NumericMatrix freqMatrix, int i, int j)
   return(freqMatrix_);
 }
 
-//[[Rcpp::export]]
-StringVector combineNames(StringVector names, int i, int j)
+void combineLabels(StringVector names, int i, int j)
 {
-  names = clone(names);
   names[i] += "+";
   names[i] += names[j];
   for(int n = j + 1; n < names.size(); n ++)
@@ -107,7 +105,6 @@ StringVector combineNames(StringVector names, int i, int j)
     names[n - 1] = names[n];
   }
   names[names.size() - 1] = " ";
-  return(names);
 }
 
 //[[Rcpp::export]]
@@ -269,12 +266,17 @@ double binary_split(NumericMatrix freqMatrix)
 }
 
 //[[Rcpp::export]]
-NumericMatrix collapse(NumericMatrix freqMatrix, String method = "iv", String mode = "J")
+List collapse(NumericMatrix freqMatrix, String method = "iv", String mode = "J")
 {
   size_t nr = freqMatrix.nrow();
+  List dimnames = freqMatrix.attr("dimnames");
+  StringVector labels = wrap(dimnames[0]);
+
   //the columns are:left, right, iv, x_stat, c_stat, adjust-lift, log likehood, likehood ratio chisq, log_odds ratio z_score, max binary split IV
   NumericMatrix trace(nr - 1, 10);
   trace.fill(NA_REAL);
+  //store labels while collapsing levels
+  StringMatrix traceLabels(nr - 1, nr);
 
   //initialization
   NumericVector good0 = wrap(freqMatrix.column(0));
@@ -289,6 +291,8 @@ NumericMatrix collapse(NumericMatrix freqMatrix, String method = "iv", String mo
   trace(0,3) = x_stat0;
   trace(0,4) = c_stat0;
   trace(0,6) = ll0;
+
+  traceLabels.row(0) = labels;
 
   //collapse
   List sub_collapse_result;
@@ -316,10 +320,15 @@ NumericMatrix collapse(NumericMatrix freqMatrix, String method = "iv", String mo
       double max_binary_iv = binary_split(freqMatrix);
       trace(i,9) = (max_binary_iv - trace(i,2)) / max_binary_iv * 100;
     }
+
+    combineLabels(labels, loc[0], loc[1]);
+    traceLabels.row(i) = labels;
+
     sub_collapse_result = sub_collapse(freqMatrix_, method, mode);
   }
 
-  return(trace);
+  return(List::create(Named("trace") = trace,
+                      Named("traceLabels") = traceLabels));
 }
 
 //test:

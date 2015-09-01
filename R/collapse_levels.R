@@ -37,10 +37,16 @@ collapseLevel <- function(x,                                # independent variab
   freqMatrix <- as.matrix(table(x, y))
   # check if there are zeros in cells
   if(any(freqMatrix == 0)) stop("There are zero cells!\n")
+
+
   #check nrow
+  if(nrow(freqMatrix) > 2)
+  {
+    res <- collapse(freqMatrix, method, mode)
+  }
 
 
-  res <- collapse(freqMatrix, method, mode)
+
 
 
 

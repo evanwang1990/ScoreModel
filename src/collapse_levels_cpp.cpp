@@ -49,7 +49,7 @@ inline double cal_iv(NumericVector good, NumericVector bad)
 }
 
 //[[Rcpp::export]]
-double cal_ll(NumericVector good, NumericVector bad)
+inline double cal_ll(NumericVector good, NumericVector bad)
 {
   double ll = 0;
   int tot;
@@ -110,7 +110,7 @@ void combineLabels(StringVector names, int i, int j)
 //[[Rcpp::export]]
 double delta(NumericVector good, NumericVector bad, int i, int j, String method = "iv")
 {
-  double delta_;
+  double delta_ = 9999.0;
   if(method == "iv")
   {
     double sum_good = sum(good);
@@ -221,16 +221,12 @@ List sub_collapse(NumericMatrix freqMatrix, String method = "iv", String mode = 
   new_bad = new_bad / sum(new_bad);
   double iv = cal_iv(new_good, new_bad);
   double x_stat = cal_x_stat(new_good, new_bad);
-  double c_stat = cal_c_stat(new_good, new_bad);
+  double c_stat = method == "J" ? cal_c_stat(new_good, new_bad):NA_REAL;
+  double adj_lift = method == "J" ? (x_stat - c_stat) / (c_stat * (n - 2)):NA_REAL;
 
 
   return(List::create(Named("freqMatrix") = freqMatrix_,
-                      Named("loc") = loc,
-                      Named("iv") = iv,
-                      Named("x_stat") = x_stat,
-                      Named("c_stat") = c_stat,
-                      Named("ll") = ll,
-                      Named("lo_zscore") = lo_zscore));
+                      Named("stat") = NumericVector::create(loc[0], loc[1], iv, x_stat, c_stat, adj_lift, ll, NA_REAL, lo_zscore, NA_REAL, NA_REAL)));
 }
 
 //[[Rcpp::export]]
@@ -244,7 +240,7 @@ double binary_split(NumericMatrix freqMatrix)
   for(size_t i = 1; i < nr - 1; ++i)
   {
     double good1 = 0; double good2 = 0; double bad1 = 0; double bad2 = 0;
-    for(size_t j = 0; j < nr - 1; ++j)
+    for(size_t j = 0; j < nr; ++j)
     {
       if(j < i)
       {
@@ -261,6 +257,7 @@ double binary_split(NumericMatrix freqMatrix)
     iv = (good1/(good1 + good2) - bad1/(bad1 + bad2)) * (log(good1/(good1 + good2)) - log(bad1/(bad1 + bad2))) +
          (good2/(good1 + good2) - bad2/(bad1 + bad2)) * (log(good2/(good1 + good2)) - log(bad2/(bad1 + bad2)));
     max_iv = max(max_iv, iv);
+    cout<<"i = "<<i<<" iv"<<iv<<endl;
   }
   return(max_iv);
 }
@@ -271,6 +268,7 @@ List collapse(NumericMatrix freqMatrix, String method = "iv", String mode = "J")
   size_t nr = freqMatrix.nrow();
   List dimnames = freqMatrix.attr("dimnames");
   StringVector labels = wrap(dimnames[0]);
+  labels = clone(labels);
 
   //the columns are:left, right, iv, x_stat, c_stat, adjust-lift, log likehood, likehood ratio chisq, log_odds ratio z_score, max binary split IV
   NumericMatrix trace(nr - 1, 10);
@@ -300,28 +298,30 @@ List collapse(NumericMatrix freqMatrix, String method = "iv", String mode = "J")
   for(size_t i = 1; i < nr - 1; ++i)
   {
     NumericMatrix freqMatrix_ = sub_collapse_result["freqMatrix"];
-    NumericVector loc = sub_collapse_result["loc"];
-    trace(i,0)  = loc[0];
-    trace(i,1)  = loc[1];
-    trace(i,2)  = sub_collapse_result["iv"];
-    trace(i,3)  = sub_collapse_result["x_stat"];
+    NumericVector stat = sub_collapse_result["stat"];
+    trace.row(i) = stat;
+    //NumericVector loc = sub_collapse_result["loc"];
+    //trace(i,0)  = loc[0];
+   // trace(i,1)  = loc[1];
+   // trace(i,2)  = sub_collapse_result["iv"];
+   // trace(i,3)  = sub_collapse_result["x_stat"];
     //monotony(c_stat) makes no sense in "All pairs" method
-    if(mode == "J")
-    {
-      trace(i,4)  = sub_collapse_result["c_stat"];
-      trace(i,5)  = (trace(i,3) - trace(i,4)) / (trace(i, 4) * (nr - i - 1));
-    }
-    trace(i,6)  = sub_collapse_result["ll"];
-    trace(i,7)  = -2 * (trace(i,6) - ll0);
-    trace(i,8)  = sub_collapse_result["lo_zscore"];
-    if(i == nr - 2)
-    {
-      //calculate max binary split iv
-      double max_binary_iv = binary_split(freqMatrix);
-      trace(i,9) = (max_binary_iv - trace(i,2)) / max_binary_iv * 100;
-    }
+   // if(mode == "J")
+  //  {
+  //    trace(i,4)  = sub_collapse_result["c_stat"];
+  //    trace(i,5)  = (trace(i,3) - trace(i,4)) / (trace(i, 4) * (nr - i - 1));
+  //  }
+  //  trace(i,6)  = sub_collapse_result["ll"];
+  //  trace(i,7)  = -2 * (trace(i,6) - ll0);
+  //  trace(i,8)  = sub_collapse_result["lo_zscore"];
+  //  if(i == nr - 2)
+  //  {
+ //     //calculate max binary split iv
+  //    double max_binary_iv = binary_split(freqMatrix);
+  //    trace(i,9) = (max_binary_iv - trace(i,2)) / max_binary_iv * 100;
+  //  }
 
-    combineLabels(labels, loc[0], loc[1]);
+    combineLabels(labels, stat[0], stat[1]);
     traceLabels.row(i) = labels;
 
     sub_collapse_result = sub_collapse(freqMatrix_, method, mode);
@@ -334,4 +334,5 @@ List collapse(NumericMatrix freqMatrix, String method = "iv", String mode = "J")
 //test:
 //tmp <- sample(20:100, 10, replace = T)
 //tmp <- matrix(c(tmp, round(tmp * (seq(1, 3, length.out = 10) + 0.5 * runif(1:10)) + sample(1:10, 10))), ncol = 2)
+//rownames(tmp) <- letters[1:10]
 //plot(tmp[,2]/tmp[,1])

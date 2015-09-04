@@ -95,7 +95,7 @@ NumericMatrix combine(NumericMatrix freqMatrix, int i, int j)
 
 void combineLabels(StringVector names, int i, int j)
 {
-  names[i] += "+";
+  names[i] += ",";
   names[i] += names[j];
   for(int n = j + 1; n < names.size(); n ++)
   {

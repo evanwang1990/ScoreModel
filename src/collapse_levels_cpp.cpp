@@ -89,12 +89,12 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
 //[[Rcpp::export]]
 StringVector GetGroups(StringVector labels, NumericVector left, NumericVector right)
 {
-  StringVector labels = clone(labels);
+  StringVector labels_ = clone(labels);
   for(int i = 0; i < left.size(); ++i)
   {
-    combineLabels(labels, left[i], right[i]);
+    combineLabels(labels_, left[i], right[i]);
   }
-  return(labels);
+  return(labels_);
 }
 
 double binary_split(NumericMatrix freqMatrix)

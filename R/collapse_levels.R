@@ -1,4 +1,11 @@
-stringCode <- function(x, y, x_, x_name, groups, SQLcode)
+#'
+#'library(process)
+#'df <- data.frame(x1 = sample(1:1000, 1e4, replace = T),
+#'                 x2 = sample(c(letters[1:3], NA), 1e4, replace = T),
+#'                 y  = c(sample(c(1, 1, 0), 5e3, replace = T), sample(c(1, 0, 0, 0), 5e3, replace = T)))
+#'res <- bestCollapse(c('x1', 'x2'), y, df, 20, method = 'iv', mode = 'J', tracefile = 'trace.Rout', sqlfile = 'sql_code.sql')
+
+stringCode <- function(x, y, x_, x_name, groups, SQLcode, method)
 {
   #collapse groups
   groups <- paste0("c(", groups[groups != " "], ")")
@@ -30,54 +37,46 @@ stringCode <- function(x, y, x_, x_name, groups, SQLcode)
   #string R code
   if(any(is.na(x))) range_ <- c(range_, "else")
   code <- paste0('"', paste(range_, woe, sep = "=", collapse = ";"), '"')
-  code <- paste0(x_name, "_w = ", paste0("recode(", paste(x_name, code, "as.factor.result = F", sep = ','), ")"))
+  code <- paste0(x_name, ifelse(method != 'mo', "_w = ", "_mw = "), paste0("recode(", paste(x_name, code, "as.factor.result = F", sep = ','), ")"))
 
   #string SQL code
   if(SQLcode)
   {
     sql_code <- paste('\twhen', range_sql, 'then', woe[!is.na(names(woe))], collapse = "\n")
     if(any(is.na(x))) sql_code <- paste(sql_code, '\n\telse', tail(woe,1))
-    sql_code <- paste('case', sql_code, paste('as', paste0(x_name, '_w'), ';'), sep = '\n')
+    sql_code <- paste('case', sql_code, paste('as', paste0(x_name, ifelse(method == 'mo', '_mw', '_w')), ','), sep = '\n')
     return(c(code, sql_code))
   }
   return(code)
 }
 
-print_trace <- function(x_name, trace, method, mode, best_indx)
+print_trace <- function(x_name, trace, method, mode, best_indx, nr, bin_iv)
 {
-  bin_iv <- round((trace[1,11] - tail(trace[,3],1)) / trace[1,11] * 100, 1e-3)
+  if(!is.na(bin_iv)) bin_iv <- round((bin_iv - trace[nr - 1,3]) / bin_iv * 100, 1e-3)
   rownames(trace)[best_indx] <- paste0(rownames(trace)[best_indx],'*')
   trace[,c(3, 5, 6, 9, 10, 11)] <- round(trace[,c(3, 5, 6, 9, 10, 11)], 1e-4)
   trace[,4] <- round(trace[,4], 1e-2)
   cat('Predictor = ', x_name, ', Method = ', method, ', Mode = ', mode, '\n', sep = '')
-  cat('Mehod: 1->maximum information value;2->maximum log-likehood;3->get monotonous\n\n')
-  print(trace[-1,])
-  cat('\nAt last step the iv decrease ', bin_iv, '% from the maximum binary-split-iv.', sep = '')
-  if(bin_iv > 5) cat(" The collapse process seems become suboptional.\n") else cat('\n')
+  cat('Mehod: 1->maximum information value;2->maximum log-likehood;3->get monotonous.\n\n')
+  print(trace)
+  if(nr > 1 && mode == 'J')
+  {
+    cat('\nAt last step the iv decrease ', bin_iv, '% from the maximum binary-split-iv.', sep = '')
+    if(bin_iv > 5) cat(" The collapse process seems become suboptional.\n") else cat('\n')
+  }
   cat('The best collapse is at', rownames(trace)[best_indx])
-  if(mode == 'J' && trace[best_indx, 7] > 1e-6) cat(', but it seems not be linear.\n') else cat('\n')
+  if(mode == 'J' && trace[best_indx, 7] > 1e-6) cat(', but it seems not be linear.\n') else cat('.\n')
   cat("===========================================================\n\n")
 }
 
-#x <- sample(c(1:1000, rep(NA, 100)), 1e4, replace = T)
-#x <- sample(c(letters[1:10], NA), 1e4, replace = T)
-#x <- sample(c(letters[1:10]), 1e4, replace = T)
-#y <- sample(c(1, 0), 1e4, replace = T)
 collapseLevel <- function(x,                                # independent variable
                           y,                                # target
                           levels,                           # initial levels
-                          method = c('iv', 'll', 'mo'),     # collapse methods
-                          mode = 'J',                       # collapse mode
-                          do.trace = T,                     # need output collapsing step?
+                          method,                           # collapse methods
+                          mode,                             # collapse mode
                           sourcefile,                       # file to store R code
                           sqlfile)
 {
-  if(missing(sourcefile)) stop("`sourcefile` is missing!\n")
-  # deal with NAs
-  if(any(is.na(y))) stop("There are NAs in target variable!\n")
-
-  # deal with `method` and `mode`
-  method <- match.arg(method)
   if(is.character(x) || (is.factor(x) && !is.ordered(x)))
   {
     if(method == 'mo')
@@ -92,30 +91,43 @@ collapseLevel <- function(x,                                # independent variab
   {
     x_ <- cut(rank(x, ties.method = 'min', na.last = "keep"), breaks = levels, labels = F)
   }else{
-    x_ <- x
+    x_ <- as.character(x)
   }
-
 
   freqMatrix <- as.matrix(table(x_, y))
   # check if there are zeros in cells
-  if(any(freqMatrix == 0)) stop("There are zero cells!\n")
-
+  if(any(freqMatrix == 0))
+  {
+    warning("There are zeros in some cells!\n")
+    return(list("need_mo" = FALSE,
+                "main"    = data.frame(var         = deparse(substitute(x)),
+                                       class       = class(x),
+                                       NAs         = sum(is.na(x))/length(x),
+                                       iv          = NA,
+                                       levels      = sum(groups != " "),
+                                       linear      = ifelse(mode == 'J', trace[best_indx, 7] < 1e-6, NA),
+                                       suboptional = NA,
+                                       method      = method,
+                                       detail      = 'zero-cell')))
+  }
 
   #check nrow
   nr <- nrow(freqMatrix)
-  if(nrow(freqMatrix) > 2)
+  if(nr > 1)
   {
-    trace <- matrix(nrow = nr - 1,
+    trace <- matrix(nrow = nr,
                     ncol = 12,
-                    dimnames = list(paste("Step", 0:(nr - 2)),
-                                    c('Left', 'Right', 'IV', 'IV decrease %', 'X_stat', 'c_stat', 'Adjust lift', 'Log likehood', 'Prob(x > LR_Chi_Sq)', 'Z_score of log odds ratio', 'Prob(z_score = 0)', 'Method')))
+                    dimnames = list(paste("Step", 0:(nr - 1)),
+                                    c('Left', 'Right', 'IV', 'IV decrease %', 'X_stat', 'C_stat', 'Adjust lift', 'Log likehood', 'Prob(x > LR_Chi_Sq)', 'Z_score of log odds ratio', 'Prob(z_score = 0)', 'Method')))
     trace <- Collapse(freqMatrix, trace, 1, method, mode)
 
     #choose the best collapse
-    trace[-1, 9] <- 1 - pchisq(-2 * (trace[-1, 8] - trace[1, 9]), (nr - 2) : 1)
+    trace[-1, 9] <- 1 - pchisq(-2 * (trace[-1, 8] - trace[1, 8]), 1:(nr - 1))
     trace[-1, 11] <- 1 - 2 * abs(pnorm(trace[-1, 10]) - 0.5)
-    best_indx <- sum((trace[-1, 9] < 0.1) + (trace[-1, 11] < 0.1)  == 0) + 1
-    print_trace(deparse(substitute(x)), trace, method, mode, best_indx)
+    bin_iv <- trace[1, 11]
+    trace[1, 11] <- 1
+    best_indx <- sum((trace[, 9] < 0.1) + (trace[, 11] < 0.1)  == 0)
+    print_trace(deparse(substitute(x)), trace, method, mode, best_indx, nr, bin_iv)
 
     #string code
     if(is.numeric(x))
@@ -125,20 +137,96 @@ collapseLevel <- function(x,                                # independent variab
       labels <- paste0("'", rownames(freqMatrix), "'")
     }
     groups <- GetGroups(labels, trace[2:best_indx, 1], trace[2:best_indx, 2])
-    SQLcode <- !missing(sqlfile)
-    stringcode <- stringCode(x, y, x_, deparse(substitute(x)), groups, SQLcode)
+    stringcode <- stringCode(x, y, x_, deparse(substitute(x)), groups, !missing(sqlfile), method)
 
     #output
-    writeLines(stringcode[1], sourcefile)
-    if(SQLcode) writeLines(stringcode[2], sqlfile)
+    writeLines(stringcode[1], sourcefile, sep = ',\n')
+    if(!missing(sqlfile)) writeLines(stringcode[2], sqlfile)
 
 
     return(list("need_mo" = (mode == 'J' && method != 'mo' && trace[best_indx, 7] > 1e-6),
                 "main"    = data.frame(var         = deparse(substitute(x)),
+                                       class       = class(x),
+                                       NAs         = sum(is.na(x))/length(x),
                                        iv          = round(trace[best_indx, 3], 1e-4),
+                                       levels      = sum(groups != " "),
+                                       linear      = ifelse(mode == 'J', trace[best_indx, 7] < 1e-6, NA),
+                                       suboptional = ifelse(mode == 'J', round((bin_iv - trace[nr - 1,3]) / bin_iv * 100, 1e-3), NA),
                                        method      = method,
-                                       suboptional = round((trace[1,11] - tail(trace[,3],1)) / trace[1,11] * 100, 1e-3),
+                                       detail      = 'normal',
                                        row.names   = NULL)))
 
+  }else if(any(is.na(x))){
+    stringcode <- stringCode(x, y, x_, deparse(substitute(x)), paste0("'",rownames(freqMatrix),"'"), !missing(sqlfile), method)
+    writeLines(stringcode[1], sourcefile, sep = ',\n')
+    if(!missing(sqlfile)) writeLines(stringcode[2], sqlfile)
+    return(list("need_mo" = FALSE,
+                "main"    = data.frame(var         = deparse(substitute(x)),
+                                       class       = class(x),
+                                       NAs         = sum(is.na(x))/length(x),
+                                       iv          = 0,
+                                       levels      = sum(groups != " "),
+                                       linear      = ifelse(mode == 'J', trace[best_indx, 7] < 1e-6, NA),
+                                       suboptional = 0,
+                                       method      = method,
+                                       detail      = 'one-level')))
   }
+}
+
+bestCollapse <- function(vars,
+                         target,
+                         dataset,
+                         max.levels,
+                         method = c('iv', 'll', 'mo'),
+                         mode = 'J',
+                         tracefile,
+                         sourcefile,
+                         sqlfile)
+{
+  attach(dataset, warn.conflicts = F)
+  # check the parameters
+  if(any(is.na(target)))                                        #target
+    stop("There are NAs in target!\n")
+  out_vars <- vars[!vars %in% names(dataset)]                   #vars
+  if(length(out_vars) != 0)
+    stop(paste(out_vars, sep = ", "), " are not in ", deparse(substitute(dataset)), " !\n")
+  method <- match.arg(method)                                   #method
+  if(!missing(tracefile))                                       #tracefile
+  {
+    tracefile <- file(tracefile, open = 'wt')
+    sink(file = tracefile, append = T, type = 'output')
+  }
+  if(missing(sourcefile))                                       #sourcefile
+  {
+    warning("`sourcefile` is missing, default file named 'woe_code.R' is set.\n")
+    sourcefile <- 'woe_code.R'
+  }
+  sourcefile <- file(sourcefile, open = 'wt')
+  writeLines("library(data.table)", sourcefile)
+  writeLines(paste0("setDT(", deparse(substitute(dataset)), ")"), sourcefile)
+  writeLines(paste0(deparse(substitute(dataset)), "[ , `:=`("), sourcefile)
+  if(!missing(sqlfile))                                         #sqlfile
+    sqlfile <- file(sqlfile, open = 'wt')
+
+  for(var in vars)
+  {
+    res <- do.call(collapseLevel, list(as.name(var), target, max.levels, method, mode, sourcefile, sqlfile))
+    if(!exists('main'))
+    {
+      main <- res$main
+    }else{
+      main <- rbind(main, res$main)
+    }
+    if(res$need_mo)
+    {
+      res <- do.call(collapseLevel, list(as.name(var), target, max.levels, 'mo', mode, sourcefile, sqlfile))
+      main <- rbind(main, res$main)
+    }
+  }
+
+  writeLines(")]", sourcefile, sep = ';\n')
+  close(sourcefile)
+  if(!missing(tracefile)) close(tracefile)
+  if(!missing(sqlfile)) close(sqlfile)
+  main
 }

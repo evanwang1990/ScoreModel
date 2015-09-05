@@ -69,20 +69,20 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
   NumericVector new_bad     = wrap(freqMatrix_.column(1));
 
   //trace
-  trace(row_indx, 0) = left;
-  trace(row_indx, 1) = right;
-  trace(row_indx, 9) = cal_log_odds_ratio_zscore(good, bad, left, right);
-  trace(row_indx, 7) = cal_ll(new_good, new_bad);
-  new_good           = new_good / sum(new_good);
-  new_bad            = new_bad / sum(new_bad);
-  trace(row_indx, 2) = cal_iv(new_good, new_bad);
-  trace(row_indx, 3) = (trace(row_indx, 2) - trace(0, 3)) * 100 / trace(0, 3);
-  trace(row_indx, 4) = cal_x_stat(new_good, new_bad);
-  trace(row_indx, 5) = mode == "J" ? cal_c_stat(new_good, new_bad):NA_REAL;
-  trace(row_indx, 6) = mode == "J" ? (trace(row_indx, 4) - trace(row_indx, 5)) / (trace(row_indx, 5) * (n - 2)):NA_REAL;
+  trace(row_indx, 0)  = left;
+  trace(row_indx, 1)  = right;
+  trace(row_indx, 9)  = cal_log_odds_ratio_zscore(good, bad, left, right);
+  trace(row_indx, 7)  = cal_ll(new_good, new_bad);
+  new_good            = new_good / sum(new_good);
+  new_bad             = new_bad / sum(new_bad);
+  trace(row_indx, 2)  = n ==2 ? 0:cal_iv(new_good, new_bad);
+  trace(row_indx, 3)  = (trace(row_indx, 2) - trace(0, 3)) * 100 / trace(0, 3);
+  trace(row_indx, 5)  = mode == "J" ? cal_c_stat(new_good, new_bad):NA_REAL;
+  trace(row_indx, 4)  = n == 2 ? trace(row_indx, 5):cal_x_stat(new_good, new_bad);
+  trace(row_indx, 6)  = n == 2 ? 0:(mode == "J" ? (trace(row_indx, 4) - trace(row_indx, 5)) / (trace(row_indx, 5) * (n - 2)):NA_REAL);
   trace(row_indx, 11) = method == "iv" ? 1:(method == "ll" ? 2:3);
 
-  if(freqMatrix_.nrow() == 2) return(trace);
+  if(n == 2) return(trace);
   return(Collapse(freqMatrix_, trace, ++ row_indx, method, mode));
 }
 

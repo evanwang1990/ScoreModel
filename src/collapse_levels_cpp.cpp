@@ -23,9 +23,11 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
   //calculate initial log-likehood and max-binary-informance-value
   if(row_indx == 1)
   {
-    trace(0, 8)  = cal_ll(good, bad);
-    trace(0, 10) = binary_split(freqMatrix);
-    trace(0, 3) = cal_iv(good / sum(good), bad / sum(bad));
+    trace(0, 7)  = cal_ll(good, bad);
+    trace(0, 8)  = 1;
+    trace(0, 10) = mode == "J" ? binary_split(freqMatrix):NA_REAL;
+    trace(0, 2)  = cal_iv(good / sum(good), bad / sum(bad));
+    trace(0, 3)  = 0;
   }
 
   //find then best collapse
@@ -76,10 +78,10 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
   new_good            = new_good / sum(new_good);
   new_bad             = new_bad / sum(new_bad);
   trace(row_indx, 2)  = n ==2 ? 0:cal_iv(new_good, new_bad);
-  trace(row_indx, 3)  = (trace(row_indx, 2) - trace(0, 3)) * 100 / trace(0, 3);
+  trace(row_indx, 3)  = (trace(row_indx, 2) - trace(0, 2)) * 100 / trace(0, 2);
   trace(row_indx, 5)  = mode == "J" ? cal_c_stat(new_good, new_bad):NA_REAL;
   trace(row_indx, 4)  = n == 2 ? trace(row_indx, 5):cal_x_stat(new_good, new_bad);
-  trace(row_indx, 6)  = n == 2 ? 0:(mode == "J" ? (trace(row_indx, 4) - trace(row_indx, 5)) / (trace(row_indx, 5) * (n - 2)):NA_REAL);
+  trace(row_indx, 6)  = mode == "J" ? (n == 2 ? 0:((trace(row_indx, 4) - trace(row_indx, 5)) / (trace(row_indx, 5) * (n - 2)))):NA_REAL;
   trace(row_indx, 11) = method == "iv" ? 1:(method == "ll" ? 2:3);
 
   if(n == 2) return(trace);
@@ -90,6 +92,7 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
 StringVector GetGroups(StringVector labels, NumericVector left, NumericVector right)
 {
   StringVector labels_ = clone(labels);
+  if(labels_.size() == 1) return(labels_);
   for(int i = 0; i < left.size(); ++i)
   {
     combineLabels(labels_, left[i], right[i]);
@@ -104,7 +107,7 @@ double binary_split(NumericMatrix freqMatrix)
   size_t nr          = freqMatrix.nrow();
   double max_iv      = R_NegInf, iv;
 
-  for(size_t i = 1; i < nr - 1; ++i)
+  for(size_t i = 1; i <= nr - 1; ++i)
   {
     double good1 = 0, good2 = 0, bad1 = 0, bad2 = 0;
     for(size_t j = 0; j < nr; ++j)

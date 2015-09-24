@@ -1,5 +1,0 @@
-x_w = recode(x,"c('a','b','d','g','f','i')=0.0345;c('c','h','j','e')=-0.0506",as.factor.result = F)
-x_w = recode(x,"c('a','b','d','g','f','i')=0.0345;c('c','h','j','e')=-0.0506",as.factor.result = F)
-x_w = recode(x,"c('a','b','d','g','f','i')=0.0345;c('c','h','j','e')=-0.0506",as.factor.result = F)
-x_w = recode(x,"c('a','b','d','g','f','i')=0.0345;c('c','h','j','e')=-0.0506",as.factor.result = F)
-x_w = recode(x,"c('a','b','c','d')=0.0336;c('e')=-0.0984;c('f','g','h','i','j')=-0.0072",as.factor.result = F)

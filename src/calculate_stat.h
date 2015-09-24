@@ -164,4 +164,13 @@ double delta(NumericVector good, NumericVector bad, int i, int j, String method 
   return(delta_);
 }
 
+double delta_zerocell(NumericVector good, NumericVector bad, int zerolevel, int nonzerolevel)
+{
+  double sum_good = sum(good);
+  double sum_bad  = sum(bad);
+  double delta_   = (good[nonzerolevel] / sum_good - bad[nonzerolevel] / sum_bad) * (log(good[nonzerolevel] / sum_good) - log(bad[nonzerolevel] / sum_bad)) -
+                    ((good[nonzerolevel] + good[zerolevel]) / sum_good - (bad[nonzerolevel] + bad[zerolevel]) / sum_bad) * (log((good[nonzerolevel] + good[zerolevel]) / sum_good) - log((bad[nonzerolevel] + bad[zerolevel]) / sum_bad));
+  return(delta_);
+}
+
 #endif

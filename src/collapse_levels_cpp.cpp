@@ -9,13 +9,14 @@ double binary_split(NumericMatrix freqMatrix);
 //tmp <- matrix(c(tmp, round(tmp * (seq(1, 3, length.out = 10) + 0.5 * runif(1:10)) + sample(1:10, 10))), ncol = 2)
 //rownames(tmp) <- letters[1:10]
 //plot(tmp[,2]/tmp[,1])
+//trace <-Collapse(tmp, matrix(NA, ncol = 13, nrow = 10))
 
 
 //[[Rcpp::export]]
 NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_indx = 1, String method = "iv", String mode = "J")
 {
-  NumericVector good = wrap(freqMatrix.column(0));
-  NumericVector bad  = wrap(freqMatrix.column(1));
+  NumericVector good = freqMatrix.column(0);
+  NumericVector bad  = freqMatrix.column(1);
   size_t n           = good.size();
   double min_delta   = R_PosInf, delta_;
   int left, right;
@@ -23,11 +24,15 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
   //calculate initial log-likehood and max-binary-informance-value
   if(row_indx == 1)
   {
-    trace(0, 7)  = cal_ll(good, bad);
-    trace(0, 8)  = 1;
-    trace(0, 10) = mode == "J" ? binary_split(freqMatrix):NA_REAL;
-    trace(0, 2)  = cal_iv(good / sum(good), bad / sum(bad));
-    trace(0, 3)  = 0;
+    trace(0, 2)  = min(good + bad);
+    trace(0, 8)  = cal_ll(good, bad);
+    trace(0, 9)  = 1;
+    trace(0, 11) = mode == "J" ? binary_split(freqMatrix):NA_REAL;
+    trace(0, 3)  = cal_iv(good / sum(good), bad / sum(bad));
+    trace(0, 4)  = 0;
+    trace(0, 6)  = mode == "J" ? cal_c_stat(good, bad):NA_REAL;
+    trace(0, 5)  = n == 2 ? trace(0, 6):cal_x_stat(good, bad);
+    trace(0, 7)  = mode == "J" ? (n == 2 ? 0:((trace(0, 5) - trace(0, 6)) / (trace(0, 6) * (n - 2)))):NA_REAL;
   }
 
   //find then best collapse
@@ -73,16 +78,17 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
   //trace
   trace(row_indx, 0)  = left;
   trace(row_indx, 1)  = right;
-  trace(row_indx, 9)  = cal_log_odds_ratio_zscore(good, bad, left, right);
-  trace(row_indx, 7)  = cal_ll(new_good, new_bad);
+  trace(row_indx, 2)  = min(new_good + new_bad);
+  trace(row_indx, 10) = cal_log_odds_ratio_zscore(good, bad, left, right);
+  trace(row_indx, 8)  = cal_ll(new_good, new_bad);
   new_good            = new_good / sum(new_good);
   new_bad             = new_bad / sum(new_bad);
-  trace(row_indx, 2)  = n ==2 ? 0:cal_iv(new_good, new_bad);
-  trace(row_indx, 3)  = (trace(row_indx, 2) - trace(0, 2)) * 100 / trace(0, 2);
-  trace(row_indx, 5)  = mode == "J" ? cal_c_stat(new_good, new_bad):NA_REAL;
-  trace(row_indx, 4)  = n == 2 ? trace(row_indx, 5):cal_x_stat(new_good, new_bad);
-  trace(row_indx, 6)  = mode == "J" ? (n == 2 ? 0:((trace(row_indx, 4) - trace(row_indx, 5)) / (trace(row_indx, 5) * (n - 2)))):NA_REAL;
-  trace(row_indx, 11) = method == "iv" ? 1:(method == "ll" ? 2:3);
+  trace(row_indx, 3)  = n ==2 ? 0:cal_iv(new_good, new_bad);
+  trace(row_indx, 4)  = (trace(row_indx, 3) - trace(0, 3)) * 100 / trace(0, 3);
+  trace(row_indx, 6)  = mode == "J" ? cal_c_stat(new_good, new_bad):NA_REAL;
+  trace(row_indx, 5)  = n == 2 ? trace(row_indx, 6):cal_x_stat(new_good, new_bad);
+  trace(row_indx, 7)  = mode == "J" ? (n == 2 ? 0:((trace(row_indx, 5) - trace(row_indx, 6)) / (trace(row_indx, 6) * (n - 2)))):NA_REAL;
+  trace(row_indx, 12) = method == "iv" ? 1:(method == "ll" ? 2:3);
 
   if(n == 2) return(trace);
   return(Collapse(freqMatrix_, trace, ++ row_indx, method, mode));

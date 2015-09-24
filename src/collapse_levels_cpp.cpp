@@ -130,3 +130,89 @@ double binary_split(NumericMatrix freqMatrix)
   }
   return(max_iv);
 }
+
+//[[Rcpp::export]]
+List CollapseZeroCells(NumericMatrix freqMatrix, IntegerMatrix trace, String mode, int iter = 0)
+{
+  int nrow = freqMatrix.rows();
+
+  int zeroflag = 0;
+  int row, col;
+  for(row = 0; row < nrow; row ++)
+  {
+    for(col = 0; col < 2; col ++)
+    {
+      if(freqMatrix(row, col) == 0)
+      {
+        zeroflag ++;
+        break;
+      }
+    }
+    if(zeroflag > 0) break;
+  }
+
+  if(zeroflag == 0 or nrow < 2 or iter > 10) return(List::create(Named("freqMatrix") = freqMatrix,
+                                                          Named("label.trace") = trace));
+
+  NumericVector good = freqMatrix.column(0);
+  NumericVector bad  = freqMatrix.column(1);
+
+  int left = -1, right = -1;
+  if(mode == "J")
+  {
+    if(row == 0) left = row;    //the first row
+    else if(row == nrow - 1) left = row - 1;    //the last row
+    else
+    {
+      if(freqMatrix(row + 1, col) == 0)    //if the nextrow also has zero in the same cells
+      {                                    //collapse them directly, because can not use "iv","ll" methods
+        left = row;
+      }
+      else if(freqMatrix(row + 1, 1 - col) == 0)    //if the nextrow has zero in the different cells
+      {                                             //collapse the frontrow directly
+        left = row - 1;
+      }
+      else
+      {
+        double delta_1 = delta_zerocell(good, bad, row, row - 1);
+        double delta_2 = delta_zerocell(good, bad, row, row + 1);
+        left = delta_1 < delta_2 ? (row - 1):row;
+      }
+    }
+    right = left + 1;
+  }
+  else
+  {
+    double min_delta = R_PosInf;
+    left = row;
+    for(int row_ = 0; row_ < nrow; row_ ++)
+    {
+      if(row_ != row)
+      {
+        if(freqMatrix(row_, col) == 0)
+        {
+          right = row_;    //preferentialy collapse the levels which have the same zero cells
+          break;
+        }
+        else if(freqMatrix(row_, 1 - col) > 0)  //make sure not to collapse the levels which has zero in different cells
+        {
+          double delta_ = delta_zerocell(good, bad, row, row_);
+          if(delta_ < min_delta)
+          {
+            min_delta = delta_;
+            right = row_;
+          }
+        }
+      }
+    }
+  }
+
+  if(right == -1) return(List::create(Named("freqMatrix") = freqMatrix,    //in mode "A", there will be two levels and
+                                      Named("label.trace") = trace));        //the diagnol element are zeros
+
+  NumericMatrix freqMatrix_ = combine(freqMatrix, left, right);
+  trace(iter, 0) = left;
+  trace(iter, 1) = right;
+  iter ++;
+  return(CollapseZeroCells(freqMatrix_, trace, mode, iter));
+}

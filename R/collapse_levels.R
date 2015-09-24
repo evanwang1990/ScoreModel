@@ -4,6 +4,7 @@
 #'                 x2 = sample(c(letters[1:3], NA), 1e4, replace = T),
 #'                 y  = c(sample(c(1, 1, 0), 5e3, replace = T), sample(c(1, 0, 0, 0), 5e3, replace = T)))
 #'res <- bestCollapse(c('x1', 'x2'), y, df, 20, method = 'iv', mode = 'J', tracefile = 'trace.Rout', sqlfile = 'sql_code.sql')
+#'collapseLevel(x = df$x2, y = df$y, levels = 20, method = 'iv', mode = 'A', minp = 0.05, sourcefile = 'test.R', sqlfile = 'test.sql')
 
 stringCode <- function(x, y, x_, x_name, groups, SQLcode, method)
 {
@@ -52,12 +53,12 @@ stringCode <- function(x, y, x_, x_name, groups, SQLcode, method)
 
 print_trace <- function(x_name, trace, method, mode, best_indx, nr, bin_iv)
 {
-  if(!is.na(bin_iv)) bin_iv <- round((bin_iv - trace[nr - 1,3]) / bin_iv * 100, 1e-3)
+  if(!is.na(bin_iv)) bin_iv <- round((bin_iv - trace[nr - 1,4]) / bin_iv * 100, 1e-3)
   rownames(trace)[best_indx] <- paste0(rownames(trace)[best_indx],'*')
-  trace[,c(3, 5, 6, 9, 10, 11)] <- round(trace[,c(3, 5, 6, 9, 10, 11)], 1e-4)
-  trace[,4] <- round(trace[,4], 1e-2)
+  trace[,c(4, 6, 7, 10, 11, 12)] <- round(trace[,c(4, 6, 7, 10, 11, 12)], 1e-4)
+  trace[,5] <- round(trace[,5], 1e-2)
   cat('Predictor = ', x_name, ', Method = ', method, ', Mode = ', mode, '\n', sep = '')
-  cat('Mehod: 1->maximum information value;2->maximum log-likehood;3->get monotonous.\n\n')
+  cat('Mehod: 1->maximum information value; 2->maximum log-likehood; 3->get monotonous.\n\n')
   print(trace)
   if(nr > 1 && mode == 'J')
   {
@@ -65,7 +66,7 @@ print_trace <- function(x_name, trace, method, mode, best_indx, nr, bin_iv)
     if(bin_iv > 5) cat(" The collapse process seems become suboptional.\n") else cat('\n')
   }
   cat('The best collapse is at', rownames(trace)[best_indx])
-  if(mode == 'J' && trace[best_indx, 7] > 1e-6) cat(', but it seems not be linear.\n') else cat('.\n')
+  if(mode == 'J' && trace[best_indx, 8] > 1e-6) cat(', but it seems not be linear.\n') else cat('.\n')
   cat("===========================================================\n\n")
 }
 
@@ -74,6 +75,7 @@ collapseLevel <- function(x,                                # independent variab
                           levels,                           # initial levels
                           method,                           # collapse methods
                           mode,                             # collapse mode
+                          minp = 0.05,                      # min percentage of the sample numbers which one level contains(include missing values)
                           sourcefile,                       # file to store R code
                           sqlfile)
 {
@@ -135,21 +137,24 @@ collapseLevel <- function(x,                                # independent variab
   if(nr > 1)
   {
     trace <- matrix(nrow = nr,
-                    ncol = 12,
+                    ncol = 13,
                     dimnames = list(paste("Step", 0:(nr - 1)),
-                                    c('Left', 'Right', 'IV', 'IV decrease %', 'X_stat', 'C_stat', 'Adjust lift', 'Log likehood', 'Prob(x > LR_Chi_Sq)', 'Z_score of log odds ratio', 'Prob(z_score = 0)', 'Method')))
+                                    c('Left', 'Right', 'minCount', 'IV', 'IV decrease %', 'X_stat', 'C_stat', 'Adjust lift', 'Log likehood', 'Prob(x > LR_Chi_Sq)', 'Z_score of log odds ratio', 'Prob(z_score = 0)', 'Method')))
     trace <- Collapse(freqMatrix, trace, 1, method, mode)
 
     #choose the best collapse
-    trace[-1, 9] <- 1 - pchisq(-2 * (trace[-1, 8] - trace[1, 8]), 1:(nr - 1))
-    trace[-1, 11] <- 1 - 2 * abs(pnorm(trace[-1, 10]) - 0.5)
-    bin_iv <- trace[1, 11]
-    trace[1, 11] <- 1
-    best_indx <- sum((trace[, 9] < 0.1) + (trace[, 11] < 0.1)  == 0)
+    trace[-1, 10] <- 1 - pchisq(-2 * (trace[-1, 9] - trace[1, 9]), 1:(nr - 1))
+    trace[-1, 12] <- 1 - 2 * abs(pnorm(trace[-1, 11]) - 0.5)
+    bin_iv <- trace[1, 12]
+    trace[1, 12] <- 1
+    best_indx <- max(min(which.max(trace[, 10] < 0.05) - 1, which.max(trace[, 12] < 0.05) - 1), which.max(trace[, 3] >= minp * length(x)))
     print_trace(deparse(substitute(x)), trace, method, mode, best_indx, nr, bin_iv)
 
     #string code
-    groups <- GetGroups(rownames(freqMatrix), trace[2:best_indx, 1], trace[2:best_indx, 2])
+    if(best_indx == 1)
+      groups <- rownames(freqMatrix)
+    else
+      groups <- GetGroups(rownames(freqMatrix), trace[2:best_indx, 1], trace[2:best_indx, 2])
     stringcode <- stringCode(x, y, x_, deparse(substitute(x)), groups, !missing(sqlfile), method)
 
     #output
@@ -157,19 +162,19 @@ collapseLevel <- function(x,                                # independent variab
     if(!missing(sqlfile)) writeLines(stringcode[2], sqlfile)
 
 
-    return(list("need_mo" = (mode == 'J' && method != 'mo' && trace[best_indx, 7] > 1e-6),
+    return(list("need_mo" = (mode == 'J' && method != 'mo' && trace[best_indx, 8] > 1e-6),
                 "main"    = data.frame(var         = deparse(substitute(x)),
                                        class       = class(x),
                                        NAs         = sum(is.na(x))/length(x),
-                                       iv          = round(trace[best_indx, 3], 1e-4),
+                                       iv          = round(trace[best_indx, 4], 1e-4),
                                        levels      = sum(groups != " "),
-                                       linear      = ifelse(mode == 'J', trace[best_indx, 7] < 1e-6, NA),
-                                       suboptional = ifelse(mode == 'J', round((bin_iv - trace[nr - 1,3]) / bin_iv * 100, 1e-3), NA),
+                                       linear      = ifelse(mode == 'J', trace[best_indx, 8] < 1e-6, NA),
+                                       suboptional = ifelse(mode == 'J', round((bin_iv - trace[nr - 1,4]) / bin_iv * 100, 1e-3), NA),
                                        method      = method,
                                        detail      = 'normal',
                                        row.names   = NULL)))
 
-  }else if(any(is.na(x))){
+  }else if(any(is.na(x))){  #the one level variables make sense only when they have missing values(just as two levels)
     stringcode <- stringCode(x, y, x_, deparse(substitute(x)), paste0("'",rownames(freqMatrix),"'"), !missing(sqlfile), method)
     writeLines(stringcode[1], sourcefile, sep = ',\n')
     if(!missing(sqlfile)) writeLines(stringcode[2], sqlfile)
@@ -179,7 +184,7 @@ collapseLevel <- function(x,                                # independent variab
                                        NAs         = sum(is.na(x))/length(x),
                                        iv          = 0,
                                        levels      = sum(groups != " "),
-                                       linear      = ifelse(mode == 'J', trace[best_indx, 7] < 1e-6, NA),
+                                       linear      = ifelse(mode == 'J', trace[best_indx, 8] < 1e-6, NA),
                                        suboptional = 0,
                                        method      = method,
                                        detail      = 'one-level')))

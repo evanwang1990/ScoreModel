@@ -95,20 +95,39 @@ collapseLevel <- function(x,                                # independent variab
   }
 
   freqMatrix <- as.matrix(table(x_, y))
-  # check if there are zeros in cells
+  if(is.numeric(x))
+  {
+    labels <- rownames(freqMatrix)
+  }else{
+    labels <- paste0("'", rownames(freqMatrix), "'")
+  }
+  rownames(freqMatrix) <- labels
+
+  # deal with the zero cells
   if(any(freqMatrix == 0))
   {
-    warning("There are zeros in some cells!\n")
-    return(list("need_mo" = FALSE,
-                "main"    = data.frame(var         = deparse(substitute(x)),
-                                       class       = class(x),
-                                       NAs         = sum(is.na(x))/length(x),
-                                       iv          = NA,
-                                       levels      = sum(groups != " "),
-                                       linear      = ifelse(mode == 'J', trace[best_indx, 7] < 1e-6, NA),
-                                       suboptional = NA,
-                                       method      = method,
-                                       detail      = 'zero-cell')))
+    #collapse levels
+    freqMatrix_nonzero <- CollapseZeroCells(freqMatrix, matrix(NA, ncol = 2, nrow = nrow(freqMatrix)), mode = mode)
+    # after processing, check if there is still zero cells
+    if(any(freqMatrix_nonzero$freqMatrix == 0))
+    {
+      warning("There are zeros in some cells!\n")
+      return(list("need_mo" = FALSE,
+                  "main"    = data.frame(var         = deparse(substitute(x)),
+                                         class       = class(x),
+                                         NAs         = sum(is.na(x))/length(x),
+                                         iv          = NA,
+                                         levels      = sum(groups != " "),
+                                         linear      = ifelse(mode == 'J', trace[best_indx, 7] < 1e-6, NA),
+                                         suboptional = NA,
+                                         method      = method,
+                                         detail      = 'zero-cell')))
+    }
+
+    #update labels of freqMatrix
+    new_labels <- GetGroups(labels, freqMatrix_nonzero$label.trace[!is.na(freqMatrix_nonzero$label.trace[,1]),1], freqMatrix_nonzero$label.trace[!is.na(freqMatrix_nonzero$label.trace[,2]),2])
+    freqMatrix <- freqMatrix_nonzero$freqMatrix
+    rownames(freqMatrix) <- new_labels[new_labels != " "]
   }
 
   #check nrow
@@ -130,13 +149,7 @@ collapseLevel <- function(x,                                # independent variab
     print_trace(deparse(substitute(x)), trace, method, mode, best_indx, nr, bin_iv)
 
     #string code
-    if(is.numeric(x))
-    {
-      labels <- rownames(freqMatrix)
-    }else{
-      labels <- paste0("'", rownames(freqMatrix), "'")
-    }
-    groups <- GetGroups(labels, trace[2:best_indx, 1], trace[2:best_indx, 2])
+    groups <- GetGroups(rownames(freqMatrix), trace[2:best_indx, 1], trace[2:best_indx, 2])
     stringcode <- stringCode(x, y, x_, deparse(substitute(x)), groups, !missing(sqlfile), method)
 
     #output

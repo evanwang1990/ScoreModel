@@ -129,7 +129,7 @@ double delta(NumericVector good, NumericVector bad, int i, int j, String method 
     double lo_zscore = cal_log_odds_ratio_zscore(good, bad, i, j);
     //under the condition that the two levels can be collapsed
     //we find the min adjust_lift(x_stat vs c_stat)
-    if(abs(lo_zscore) > 1.64) //p_value <= 0.1
+    if(abs(lo_zscore) > 1.96) //p_value <= 0.05
       return(9999.0);
     int n = good.size() - 1;
     NumericVector new_good(n);

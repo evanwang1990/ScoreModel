@@ -94,17 +94,6 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
   return(Collapse(freqMatrix_, trace, ++ row_indx, method, mode));
 }
 
-//[[Rcpp::export]]
-StringVector GetGroups(StringVector labels, NumericVector left, NumericVector right)
-{
-  StringVector labels_ = clone(labels);
-  if(labels_.size() == 1) return(labels_);
-  for(int i = 0; i < left.size(); ++i)
-  {
-    combineLabels(labels_, left[i], right[i]);
-  }
-  return(labels_);
-}
 
 double binary_split(NumericMatrix freqMatrix)
 {
@@ -222,3 +211,24 @@ List CollapseZeroCells(NumericMatrix freqMatrix, IntegerMatrix trace, String mod
   iter ++;
   return(CollapseZeroCells(freqMatrix_, trace, mode, iter));
 }
+
+
+//[[Rcpp::export]]
+NumericMatrix combineResults(NumericMatrix freqMatrix, NumericVector left, NumericVector right)
+{
+  NumericMatrix freqMatrix_ = clone(freqMatrix);
+  List dimnames             = freqMatrix_.attr("dimnames");
+  StringVector labels      = dimnames[0];
+  if(labels.size() == 1) return freqMatrix_;
+  for(int i = 0; i < left.size(); ++i)
+  {
+    combineLabels(labels, left[i], right[i]);
+    freqMatrix_ = combine(freqMatrix_, left[i], right[i]);
+  }
+
+  StringVector labels_(freqMatrix.nrow() - left.size());
+  for(int i = 0; i < labels_.size(); i ++) labels_[i] = labels[i];
+  freqMatrix_.attr("dimnames") = List::create(labels_, dimnames[1]);
+  return freqMatrix_;
+}
+

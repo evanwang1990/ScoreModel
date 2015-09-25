@@ -5,71 +5,6 @@
 #'                 y  = c(sample(c(1, 1, 0), 5e3, replace = T), sample(c(1, 0, 0, 0), 5e3, replace = T)))
 #'res <- bestCollapse(c('x1', 'x2'), y, df, 20, method = 'iv', mode = 'J', tracefile = 'trace.Rout', sqlfile = 'sql_code.sql')
 #'collapseLevel(x = df$x2, y = df$y, levels = 20, method = 'iv', mode = 'A', minp = 0.05, sourcefile = 'test.R', sqlfile = 'test.sql')
-
-stringCode <- function(x, y, x_, x_name, groups, SQLcode, method)
-{
-  #collapse groups
-  groups <- paste0("c(", groups[groups != " "], ")")
-  for(i in 1:length(groups))
-  {
-    x_[x_ %in% eval(parse(text = groups[i]))] <- i
-  }
-
-  #caculate range
-  if(is.numeric(x))
-  {
-    range_ <- tapply(x, x_, max)
-    if(SQLcode)
-    {
-      range_sql <- paste0(paste0(c('', range_[-length(range_)]), "<", x_name), "<=", c(range_[-length(range_)], ''))
-      range_sql[1] <- substring(range_sql[1], 2)
-      range_sql[length(range_sql)] <- substr(range_sql[length(range_sql)], 1, nchar(range_sql[length(range_sql)]) - 2)
-    }
-    range_ <- paste(c(-Inf, range_[-length(range_)]), c(range_[-length(range_)], Inf), sep = "<-")
-  }else{
-    range_ <- groups
-    if(SQLcode) range_sql <- paste(x_name, 'in', substring(groups, 2))
-  }
-
-  #calculate WOE
-  propMatrix <- as.matrix(prop.table(table(x_, y, useNA = 'ifany'), 2))
-  woe <- round(log(propMatrix[,2] / propMatrix[,1]), unit = 1e-4)
-
-  #string R code
-  if(any(is.na(x))) range_ <- c(range_, "else")
-  code <- paste0('"', paste(range_, woe, sep = "=", collapse = ";"), '"')
-  code <- paste0(x_name, ifelse(method != 'mo', "_w = ", "_mw = "), paste0("recode(", paste(x_name, code, "as.factor.result = F", sep = ','), ")"))
-
-  #string SQL code
-  if(SQLcode)
-  {
-    sql_code <- paste('\twhen', range_sql, 'then', woe[!is.na(names(woe))], collapse = "\n")
-    if(any(is.na(x))) sql_code <- paste(sql_code, '\n\telse', tail(woe,1))
-    sql_code <- paste('case', sql_code, paste('as', paste0(x_name, ifelse(method == 'mo', '_mw', '_w')), ','), sep = '\n')
-    return(c(code, sql_code))
-  }
-  return(code)
-}
-
-print_trace <- function(x_name, trace, method, mode, best_indx, nr, bin_iv)
-{
-  if(!is.na(bin_iv)) bin_iv <- round((bin_iv - trace[nr - 1,4]) / bin_iv * 100, 1e-3)
-  rownames(trace)[best_indx] <- paste0(rownames(trace)[best_indx],'*')
-  trace[,c(4, 6, 7, 10, 11, 12)] <- round(trace[,c(4, 6, 7, 10, 11, 12)], 1e-4)
-  trace[,5] <- round(trace[,5], 1e-2)
-  cat('Predictor = ', x_name, ', Method = ', method, ', Mode = ', mode, '\n', sep = '')
-  cat('Mehod: 1->maximum information value; 2->maximum log-likehood; 3->get monotonous.\n\n')
-  print(trace)
-  if(nr > 1 && mode == 'J')
-  {
-    cat('\nAt last step the iv decrease ', bin_iv, '% from the maximum binary-split-iv.', sep = '')
-    if(bin_iv > 5) cat(" The collapse process seems become suboptional.\n") else cat('\n')
-  }
-  cat('The best collapse is at', rownames(trace)[best_indx])
-  if(mode == 'J' && trace[best_indx, 8] > 1e-6) cat(', but it seems not be linear.\n') else cat('.\n')
-  cat("===========================================================\n\n")
-}
-
 collapseLevel <- function(x,                                # independent variable
                           y,                                # target
                           levels,                           # initial levels
@@ -87,6 +22,8 @@ collapseLevel <- function(x,                                # independent variab
       method <- 'iv'
     }
     mode <- 'A'
+  }else{
+    mode <- 'J'
   }
 
   if(is.numeric(x))
@@ -148,18 +85,52 @@ collapseLevel <- function(x,                                # independent variab
     bin_iv <- trace[1, 12]
     trace[1, 12] <- 1
     best_indx <- max(min(which.max(trace[, 10] < 0.05) - 1, which.max(trace[, 12] < 0.05) - 1), which.max(trace[, 3] >= minp * length(x)))
+
+    #get collapsed result
+    if(best_indx == 1)
+      collapsed_result <- freqMatrix
+    else
+      collapsed_result <- combineResults(freqMatrix, trace[2:best_indx, 1], trace[2:best_indx, 2])
+      collapsed_result <- data.table(collapsed_result, keep.rownames = T)
+      setnames(collapsed_result, c('band', 'CntGood', 'CntBad'))
+      collapsed_result[, `:=`(band         = band(x, x_, band),
+                              CntRec       = CntGood + CntBad
+                              )
+                       ][, `:=`(PctRec     = paste0(round(CntRec / length(x) * 100, 2), '%'),
+                                GoodRate   = paste0(round(CntGood / CntRec * 100, 2), '%'),
+                                BadRate    = paste0(round(CntBad / CntRec * 100, 2), '%'),
+                                WoE        = round(log(CntGood / sum(y == 0)) - log(CntBad / sum(y == 1)), 4),
+                                IV         = round((CntGood / sum(y == 0) - CntBad / sum(y == 1)) * (log(CntGood / sum(y == 0)) - log(CntBad / sum(y == 0))), 4)
+                                  )]
+      if(any(is.na(x))) #add missing values
+      {
+        NA_good <- sum(is.na(x) & y == 0)
+        NA_bad  <- sum(is.na(x) & y == 1)
+        NA_tot <- NA_good + NA_bad
+
+        collapse_result <- rbind(collapsed_result,
+                                 data.frame(band       = 'missing',
+                                             CntGood    = NA_good,
+                                             CntBad     = NA_bad,
+                                             CntRec     = NA_tot,
+                                             PctRec     = paste0(round(NA_tot / length(x) * 100, 2), '%'),
+                                             GoodRate   = paste0(round(NA_good / NA_tot * 100, 2), '%'),
+                                             BadRate    = paste0(round(NA_bad / NA_tot * 100, 2), '%'),
+                                             WoE        = ifelse(NA_good * NA_bad == 0, NA, round(log(NA_good / sum(y == 0)) - log(NA_bad / sum(y == 1)), 4)),
+                                             IV         = ifelse(NA_good * NA_bad == 0, NA, round((NA_good / sum(y == 0) - NA_bad / sum(y == 1)) * (log(NA_good / sum(y == 0)) - log(NA_bad / sum(y == 0))), 4))
+                                             ))
+      }
+
+
+
     print_trace(deparse(substitute(x)), trace, method, mode, best_indx, nr, bin_iv)
 
-    #string code
-    if(best_indx == 1)
-      groups <- rownames(freqMatrix)
-    else
-      groups <- GetGroups(rownames(freqMatrix), trace[2:best_indx, 1], trace[2:best_indx, 2])
-    stringcode <- stringCode(x, y, x_, deparse(substitute(x)), groups, !missing(sqlfile), method)
+
+    #stringcode <- stringCode(x, y, x_, deparse(substitute(x)), groups, !missing(sqlfile), method)
 
     #output
-    writeLines(stringcode[1], sourcefile, sep = ',\n')
-    if(!missing(sqlfile)) writeLines(stringcode[2], sqlfile)
+    #writeLines(stringcode[1], sourcefile, sep = ',\n')
+    #if(!missing(sqlfile)) writeLines(stringcode[2], sqlfile)
 
 
     return(list("need_mo" = (mode == 'J' && method != 'mo' && trace[best_indx, 8] > 1e-6),

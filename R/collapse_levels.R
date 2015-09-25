@@ -121,6 +121,7 @@ collapseLevel <- function(x,                                # independent variab
                                              ))
       }
 
+      collapse_result[, WoE_barplot := barplot.woe(WoE)]
 
 
     print_trace(deparse(substitute(x)), trace, method, mode, best_indx, nr, bin_iv)

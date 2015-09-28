@@ -28,10 +28,12 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
     trace(0, 8)  = cal_ll(good, bad);
     trace(0, 9)  = 1;
     trace(0, 11) = mode == "J" ? binary_split(freqMatrix):NA_REAL;
-    trace(0, 3)  = cal_iv(good / sum(good), bad / sum(bad));
+    NumericVector good__ = good / sum(good);
+    NumericVector bad__  = bad / sum(bad);
+    trace(0, 3)  = cal_iv(good__, bad__);
     trace(0, 4)  = 0;
-    trace(0, 6)  = mode == "J" ? cal_c_stat(good, bad):NA_REAL;
-    trace(0, 5)  = n == 2 ? trace(0, 6):cal_x_stat(good, bad);
+    trace(0, 6)  = mode == "J" ? cal_c_stat(good__, bad__):NA_REAL;
+    trace(0, 5)  = n == 2 ? trace(0, 6):cal_x_stat(good__, bad__);
     trace(0, 7)  = mode == "J" ? (n == 2 ? 0:((trace(0, 5) - trace(0, 6)) / (trace(0, 6) * (n - 2)))):NA_REAL;
   }
 
@@ -72,8 +74,8 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
 
   //get new freqmatrix
   NumericMatrix freqMatrix_ = combine(freqMatrix, left, right);
-  NumericVector new_good    = wrap(freqMatrix_.column(0));
-  NumericVector new_bad     = wrap(freqMatrix_.column(1));
+  NumericVector new_good    = freqMatrix_.column(0);
+  NumericVector new_bad     = freqMatrix_.column(1);
 
   //trace
   trace(row_indx, 0)  = left;

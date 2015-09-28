@@ -56,8 +56,8 @@ collapseLevel <- function(x,                                # independent variab
                                          class       = class(x),
                                          NAs         = sum(is.na(x))/length(x),
                                          iv          = NA,
-                                         levels      = sum(groups != " "),
-                                         linear      = ifelse(mode == 'J', trace[best_indx, 7] < 1e-6, NA),
+                                         levels      = NA,
+                                         linear      = NA,
                                          suboptional = NA,
                                          method      = method,
                                          detail      = 'zero-cell')))
@@ -76,7 +76,7 @@ collapseLevel <- function(x,                                # independent variab
     trace <- matrix(nrow = nr,
                     ncol = 13,
                     dimnames = list(paste("Step", 0:(nr - 1)),
-                                    c('Left', 'Right', 'minCount', 'IV', 'IV decrease %', 'X_stat', 'C_stat', 'Adjust lift', 'Log likehood', 'Prob(x > LR_Chi_Sq)', 'Z_score of log odds ratio', 'Prob(z_score = 0)', 'Method')))
+                                    c('Left', 'Right', 'minCount', 'IV', 'IV_decrease', 'X_stat', 'C_stat', 'Adjust_lift', 'Log_likehood', 'Prob(LR_Chi_Sq)', 'Z_score_of_log_odds_ratio', 'Prob(z_score)', 'Method')))
     trace <- Collapse(freqMatrix, trace, 1, method, mode)
 
     #choose the best collapse
@@ -86,45 +86,44 @@ collapseLevel <- function(x,                                # independent variab
     trace[1, 12] <- 1
     best_indx <- max(min(which.max(trace[, 10] < 0.05) - 1, which.max(trace[, 12] < 0.05) - 1), which.max(trace[, 3] >= minp * length(x)))
 
-    #get collapsed result
-    if(best_indx == 1)
+    #get collapsed result----
+    if(best_indx == 1){
       collapsed_result <- freqMatrix
-    else
+    }else{
       collapsed_result <- combineResults(freqMatrix, trace[2:best_indx, 1], trace[2:best_indx, 2])
-      collapsed_result <- data.table(collapsed_result, keep.rownames = T)
-      setnames(collapsed_result, c('band', 'CntGood', 'CntBad'))
-      collapsed_result[, `:=`(band         = band(x, x_, band),
-                              CntRec       = CntGood + CntBad
-                              )
-                       ][, `:=`(PctRec     = paste0(round(CntRec / length(x) * 100, 2), '%'),
-                                GoodRate   = paste0(round(CntGood / CntRec * 100, 2), '%'),
-                                BadRate    = paste0(round(CntBad / CntRec * 100, 2), '%'),
-                                WoE        = round(log(CntGood / sum(y == 0)) - log(CntBad / sum(y == 1)), 4),
-                                IV         = round((CntGood / sum(y == 0) - CntBad / sum(y == 1)) * (log(CntGood / sum(y == 0)) - log(CntBad / sum(y == 0))), 4)
-                                  )]
-      if(any(is.na(x))) #add missing values
-      {
-        NA_good <- sum(is.na(x) & y == 0)
-        NA_bad  <- sum(is.na(x) & y == 1)
-        NA_tot <- NA_good + NA_bad
+    }
+    collapsed_result <- data.table(collapsed_result, keep.rownames = T)
+    setnames(collapsed_result, c('band', 'CntGood', 'CntBad'))
+    collapsed_result[, `:=`(band         = band(x, x_, band),
+                            CntRec       = CntGood + CntBad)
+                     ][, `:=`(PctRec     = paste0(round(CntRec / length(x) * 100, 2), '%'),
+                              GoodRate   = paste0(round(CntGood / CntRec * 100, 2), '%'),
+                              BadRate    = paste0(round(CntBad / CntRec * 100, 2), '%'),
+                              WoE        = round(log(CntGood / sum(y == 0)) - log(CntBad / sum(y == 1)), 4),
+                              IV         = round((CntGood / sum(y == 0) - CntBad / sum(y == 1)) * (log(CntGood / sum(y == 0)) - log(CntBad / sum(y == 1))), 4))]
+    if(any(is.na(x))) #add missing values
+    {
+      NA_good <- sum(is.na(x) & y == 0)
+      NA_bad  <- sum(is.na(x) & y == 1)
+      NA_tot <- NA_good + NA_bad
 
-        collapse_result <- rbind(collapsed_result,
-                                 data.frame(band       = 'missing',
-                                             CntGood    = NA_good,
-                                             CntBad     = NA_bad,
-                                             CntRec     = NA_tot,
-                                             PctRec     = paste0(round(NA_tot / length(x) * 100, 2), '%'),
-                                             GoodRate   = paste0(round(NA_good / NA_tot * 100, 2), '%'),
-                                             BadRate    = paste0(round(NA_bad / NA_tot * 100, 2), '%'),
-                                             WoE        = ifelse(NA_good * NA_bad == 0, NA, round(log(NA_good / sum(y == 0)) - log(NA_bad / sum(y == 1)), 4)),
-                                             IV         = ifelse(NA_good * NA_bad == 0, NA, round((NA_good / sum(y == 0) - NA_bad / sum(y == 1)) * (log(NA_good / sum(y == 0)) - log(NA_bad / sum(y == 0))), 4))
-                                             ))
-      }
+      collapsed_result <- rbind(collapsed_result,
+                               data.frame(band       = 'missing',
+                                           CntGood    = NA_good,
+                                           CntBad     = NA_bad,
+                                           CntRec     = NA_tot,
+                                           PctRec     = paste0(round(NA_tot / length(x) * 100, 2), '%'),
+                                           GoodRate   = paste0(round(NA_good / NA_tot * 100, 2), '%'),
+                                           BadRate    = paste0(round(NA_bad / NA_tot * 100, 2), '%'),
+                                           WoE        = ifelse(NA_good * NA_bad == 0, NA, round(log(NA_good / sum(y == 0)) - log(NA_bad / sum(y == 1)), 4)),
+                                           IV         = ifelse(NA_good * NA_bad == 0, NA, round((NA_good / sum(y == 0) - NA_bad / sum(y == 1)) * (log(NA_good / sum(y == 0)) - log(NA_bad / sum(y == 0))), 4))
+                                           ))
+    }
 
-      collapse_result[, WoE_barplot := barplot.woe(WoE)]
+    collapsed_result[, WoE_barplot := barplot.woe(WoE)]
 
-
-    print_trace(deparse(substitute(x)), trace, method, mode, best_indx, nr, bin_iv)
+    #print trace----
+    print_trace(deparse(substitute(x)), trace, collapsed_result, method, mode, best_indx, nr, bin_iv)
 
 
     #stringcode <- stringCode(x, y, x_, deparse(substitute(x)), groups, !missing(sqlfile), method)
@@ -139,7 +138,7 @@ collapseLevel <- function(x,                                # independent variab
                                        class       = class(x),
                                        NAs         = sum(is.na(x))/length(x),
                                        iv          = round(trace[best_indx, 4], 1e-4),
-                                       levels      = sum(groups != " "),
+                                       levels      = nrow(collapsed_result) - any(is.na(x)),
                                        linear      = ifelse(mode == 'J', trace[best_indx, 8] < 1e-6, NA),
                                        suboptional = ifelse(mode == 'J', round((bin_iv - trace[nr - 1,4]) / bin_iv * 100, 1e-3), NA),
                                        method      = method,
@@ -155,7 +154,7 @@ collapseLevel <- function(x,                                # independent variab
                                        class       = class(x),
                                        NAs         = sum(is.na(x))/length(x),
                                        iv          = 0,
-                                       levels      = sum(groups != " "),
+                                       levels      = 1,
                                        linear      = ifelse(mode == 'J', trace[best_indx, 8] < 1e-6, NA),
                                        suboptional = 0,
                                        method      = method,

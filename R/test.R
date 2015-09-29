@@ -4,6 +4,14 @@ table(chileancredit$FlagGB) # Tabulate target variable
 
 # Training and testing samples (Just some basic formality for Modeling)
 chileancredit.train=subset(chileancredit,FlagSample==1 & !is.na(FlagGB))
+attach(chileancredit.train)
+chileancredit.train$FlagGB[FlagGB == 1 & Performance == '70: Never delinquent' & runif(length(FlagGB)) < 0.05] <- 0
+chileancredit.train$FlagGB[FlagGB == 1 & Performance == '62: 1 x 1-29' & runif(length(FlagGB)) < 0.05] <- 0
+chileancredit.train$FlagGB[FlagGB == 0 & Performance == '20: 1+ x 90+' & runif(length(FlagGB)) < 0.05] <- 1
+detach(chileancredit.train)
+with(chileancredit.train, table(Performance, FlagGB))
+ctree1 <- ctree(factor(FlagGB) ~ Performance, data = chileancredit.train)
+
 chileancredit.test=subset(chileancredit,FlagSample==0 & !is.na(FlagGB))
 
 # Package application

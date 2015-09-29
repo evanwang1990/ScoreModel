@@ -1,3 +1,7 @@
+
+
+注意：missing nonmissing的情况
+
 stringCode <- function(x, y, x_, x_name, groups, SQLcode, method)
 {
   #collapse groups

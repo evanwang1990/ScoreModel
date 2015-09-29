@@ -10,6 +10,8 @@ License: What license is it under?
 LazyData: TRUE
 Imports:
     Rcpp (>= 0.11.6),
-    partykit
+    partykit,
+    reshape2,
+    data.table
 LinkingTo:
     Rcpp

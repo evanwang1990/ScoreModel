@@ -8,6 +8,7 @@
 
 #setcolorder
 #对于其中的缺失值,求WOE
+#WOE计算反了
 
 
 

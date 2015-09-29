@@ -234,3 +234,11 @@ NumericMatrix combineResults(NumericMatrix freqMatrix, NumericVector left, Numer
   return freqMatrix_;
 }
 
+//[[Rcpp::export]]
+double linearity(NumericVector good, NumericVector bad)
+{
+  double c_stat    = cal_c_stat(good, bad);
+  double x_stat    = cal_x_stat(good, bad);
+  double adj_lift  = (x_stat - c_stat) / (c_stat * (good.size() - 2));
+  return adj_lift;
+}

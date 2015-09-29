@@ -5,14 +5,20 @@
 #'                 y  = c(sample(c(1, 1, 0), 5e3, replace = T), sample(c(1, 0, 0, 0), 5e3, replace = T)))
 #'res <- bestCollapse(c('x1', 'x2'), y, df, 20, method = 'iv', mode = 'J', tracefile = 'trace.Rout', sqlfile = 'sql_code.sql')
 #'collapseLevel(x = df$x2, y = df$y, levels = 20, method = 'iv', mode = 'A', minp = 0.05, sourcefile = 'test.R', sqlfile = 'test.sql')
+
+#setcolorder
+#对于其中的缺失值,求WOE
+
+
+
+
 collapseLevel <- function(x,                                # independent variable
                           y,                                # target
                           levels,                           # initial levels
                           method,                           # collapse methods
                           mode,                             # collapse mode
-                          minp = 0.05,                      # min percentage of the sample numbers which one level contains(include missing values)
-                          sourcefile,                       # file to store R code
-                          sqlfile)
+                          minp = 0.05                       # min percentage of the sample numbers which one level contains(include missing values)
+                          )
 {
   if(is.character(x) || (is.factor(x) && !is.ordered(x)))
   {
@@ -94,7 +100,7 @@ collapseLevel <- function(x,                                # independent variab
     }
     collapsed_result <- data.table(collapsed_result, keep.rownames = T)
     setnames(collapsed_result, c('band', 'CntGood', 'CntBad'))
-    collapsed_result[, `:=`(band         = band(x, x_, band),
+    collapsed_result[, `:=`(band         = band.collapse(x, x_, band),
                             CntRec       = CntGood + CntBad)
                      ][, `:=`(PctRec     = paste0(round(CntRec / length(x) * 100, 2), '%'),
                               GoodRate   = paste0(round(CntGood / CntRec * 100, 2), '%'),
@@ -160,62 +166,4 @@ collapseLevel <- function(x,                                # independent variab
                                        method      = method,
                                        detail      = 'one-level')))
   }
-}
-
-bestCollapse <- function(vars,
-                         target,
-                         dataset,
-                         max.levels,
-                         method = c('iv', 'll', 'mo'),
-                         mode = 'J',
-                         tracefile,
-                         sourcefile,
-                         sqlfile)
-{
-  attach(dataset, warn.conflicts = F)
-  # check the parameters
-  if(any(is.na(target)))                                        #target
-    stop("There are NAs in target!\n")
-  out_vars <- vars[!vars %in% names(dataset)]                   #vars
-  if(length(out_vars) != 0)
-    stop(paste(out_vars, sep = ", "), " are not in ", deparse(substitute(dataset)), " !\n")
-  method <- match.arg(method)                                   #method
-  if(!missing(tracefile))                                       #tracefile
-  {
-    tracefile <- file(tracefile, open = 'wt')
-    sink(file = tracefile, append = T, type = 'output')
-  }
-  if(missing(sourcefile))                                       #sourcefile
-  {
-    warning("`sourcefile` is missing, default file named 'woe_code.R' is set.\n")
-    sourcefile <- 'woe_code.R'
-  }
-  sourcefile <- file(sourcefile, open = 'wt')
-  writeLines("library(data.table)", sourcefile)
-  writeLines(paste0("setDT(", deparse(substitute(dataset)), ")"), sourcefile)
-  writeLines(paste0(deparse(substitute(dataset)), "[ , `:=`("), sourcefile)
-  if(!missing(sqlfile))                                         #sqlfile
-    sqlfile <- file(sqlfile, open = 'wt')
-
-  for(var in vars)
-  {
-    res <- do.call(collapseLevel, list(as.name(var), target, max.levels, method, mode, sourcefile, sqlfile))
-    if(!exists('main'))
-    {
-      main <- res$main
-    }else{
-      main <- rbind(main, res$main)
-    }
-    if(res$need_mo)
-    {
-      res <- do.call(collapseLevel, list(as.name(var), target, max.levels, 'mo', mode, sourcefile, sqlfile))
-      main <- rbind(main, res$main)
-    }
-  }
-
-  writeLines(")]", sourcefile, sep = ';\n')
-  close(sourcefile)
-  if(!missing(tracefile)) close(tracefile)
-  if(!missing(sqlfile)) close(sqlfile)
-  main
 }

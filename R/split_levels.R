@@ -87,7 +87,7 @@ splitLevel <- function(x,
                                      'IV'             = max(splitResult$IV),
                                      'IV_decrease'    = 0,
                                      'is.linear'      = is.linear,
-                                     'is.suboptional' = F,
+                                     'is.suboptional' = FALSE,
                                      'method'         = 'ct',
                                      'detail'         = ''),
               'detail'  = splitResult[1:(nrow(splitResult) - 1)]))

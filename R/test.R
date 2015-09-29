@@ -1,8 +1,5 @@
-data(chileancredit) # Load smbinning sample dataset (Chilean Credit)
-str(chileancredit) # Quick description of the data
-table(chileancredit$FlagGB) # Tabulate target variable
 
-# Training and testing samples (Just some basic formality for Modeling)
+data(chileancredit, package = 'smbinning') # Load smbinning sample dataset (Chilean Credit)
 chileancredit.train=subset(chileancredit,FlagSample==1 & !is.na(FlagGB))
 attach(chileancredit.train)
 chileancredit.train$FlagGB[FlagGB == 1 & Performance == '70: Never delinquent' & runif(length(FlagGB)) < 0.05] <- 0

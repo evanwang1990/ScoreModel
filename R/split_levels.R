@@ -1,4 +1,3 @@
-#目前问题是：对于ordered factor应该使用breaks来处理，这个明天改进
 
 splitLevel <- function(x,
                        y,
@@ -26,20 +25,21 @@ splitLevel <- function(x,
   if(is.numeric(x))
   {
     breaks <- sort(unlist(sapply(1:length(split), function(i) split[[i]]$node$split$breaks)))
-    x_ <- cut(x, breaks = c(range(x, na.rm = T), breaks), include.lowest = T, labels = F)
+    x_ <- cut(x, breaks = unique(c(range(x, na.rm = T), breaks)), include.lowest = T, labels = F)
     band <- paste(c('', breaks), c(breaks, ''), sep = ' ~ ')
-  }else{
-    levels <- levels(x)
+  }else if(is.ordered(x)){
+    breaks <- sort(unlist(sapply(1:length(split), function(i) split[[i]]$node$split$breaks)))
+    levels <- paste0("'", levels(x), "'")
+    breaks <- cut(1:length(levels), breaks = unique(c(0, length(levels), breaks)), labels = F)
+    band <- tapply(levels, breaks, paste0, collapse = ',')
+    x_ <- breaks[match(as.character(x), levels(x))]
+    }else{
+    levels <- paste0("'", levels(x), "'")
     indexes <- unlist(sapply(1:length(split), function(i) split[[i]]$node$split$index))
     indexes[is.na(indexes)] <- ''
     indexes <- apply(matrix(indexes, ncol = length(levels), byrow = T), 2, paste0, collapse = '')
-    x_ <- as.character(x)
-    for(indx in which(indexes != ''))
-    {
-      x_[x_ == levels[indx]] <- indexes[indx]
-    }
-    band <- sapply(sort(unique(indexes[indexes != ''])),
-                   function(indx) paste0("'", paste(levels[which(indexes %in% indx)], collapse = "','"), "'"))
+    x_ <- indexes[match(x, levels(x))]
+    band <- tapply(levels, indexes, paste0, collapse = ',')
   }
   if(any(is.na(x))) band <- c(band, 'missing')
 

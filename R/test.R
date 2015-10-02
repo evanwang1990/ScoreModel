@@ -7,6 +7,7 @@ chileancredit.train$FlagGB[FlagGB == 1 & Performance == '62: 1 x 1-29' & runif(l
 chileancredit.train$FlagGB[FlagGB == 0 & Performance == '20: 1+ x 90+' & runif(length(FlagGB)) < 0.05] <- 1
 detach(chileancredit.train)
 with(chileancredit.train, table(Performance, FlagGB))
+chileancredit.train <- within(chileancredit.train, Performance <- factor(as.character(Performance), ordered = F))
 ctree1 <- ctree(factor(FlagGB) ~ Performance, data = chileancredit.train)
 
 chileancredit.test=subset(chileancredit,FlagSample==0 & !is.na(FlagGB))

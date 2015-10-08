@@ -1,4 +1,10 @@
-
+#' @name splitLevel
+#' @title create WOE using ctree to split level
+#' @param x independent variable
+#' @param y target variable
+#' @param df data frame
+#' @param minp minimum percentage in each level
+#' @export
 splitLevel <- function(x,
                        y,
                        df,

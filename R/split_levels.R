@@ -5,15 +5,18 @@
 #' @param df data frame
 #' @param minp minimum percentage in each level
 #' @export
-splitLevel <- function(x,
-                       y,
-                       df,
-                       minp = 0.05)
+splitLevel <- function(formula, df, minp = 0.05)
 {
-  if(is.character(x)) expr <- paste0(deparse(substitute(y)), ' ~ factor(', deparse(substitute(x)), ')')
-  else expr <- paste(deparse(substitute(y)), '~', deparse(substitute(x)))
+  if (is.character(formula)) formula <- as.formula(formula)
+  if (class(formula) != 'formula') stop("Formula is not correct.")
+  if (any(!all.vars(formula) %in% names(df))) stop("Variables in formula is not in df.")
 
-  split <- ctree(formula(expr), df, na.action = na.exclude, control = ctree_control(minbucket = minp * length(x)))
+  elem <- as.list(formula)
+  y <- eval(elem[[2]], df, parent.frame())
+  x <- eval(elem[[3]], df, parent.frame())
+  if (is.character(x)) formula <- substitute(y ~ factor(x), list(y = elem[[2]], x = elem[[3]]))
+
+  split <- ctree(formula, df, na.action = na.exclude, control = ctree_control(minbucket = minp * length(x)))
   bins <- width(split)
   #total one level including missing values
   if(bins == 1)
@@ -46,6 +49,9 @@ splitLevel <- function(x,
     indexes <- apply(matrix(indexes, ncol = length(levels), byrow = T), 2, paste0, collapse = '')
     x_ <- indexes[match(x, levels(x))]
     band <- tapply(levels, indexes, paste0, collapse = ',')
+    #delete the levels in which the frequency equals zero
+    #one reason is sampling which can reduce the frequency
+    band <- band[names(band) != '']
   }
   if(any(is.na(x))) band <- c(band, 'missing')
 
@@ -86,7 +92,7 @@ splitLevel <- function(x,
     is.linear <- linearity(freqMatrix[,1], freqMatrix[,2]) < 1e-6
   }
 
-  return(list('summary' = data.frame('var'             = deparse(substitute(x)),
+  return(list('summary' = data.frame('var'             = deparse(elem[[3]]),
                                      'class'          = class(x),
                                      'PctNA'          = round(sum(is.na(x)) / length(x), 3),
                                      'levels'         = nrow(splitResult) - 1 - any(is.na(x)),
@@ -94,7 +100,7 @@ splitLevel <- function(x,
                                      'IV_decrease'    = 0,
                                      'is.linear'      = is.linear,
                                      'is.suboptional' = FALSE,
-                                     'method'         = 'ct',
+                                     'method'         = 'ctree',
                                      'detail'         = ''),
               'detail'  = splitResult[1:(nrow(splitResult) - 1)]))
 }

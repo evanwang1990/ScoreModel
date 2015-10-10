@@ -1,3 +1,6 @@
+
+#print_trace(deparse(substitute(x)), trace, collapsed_result, method, mode, best_indx, nr, bin_iv)
+#自变量名，trace矩阵，分层后的结果，方法，最好的分组，原始的层数,binary_split_iv
 print_trace <- function(x_name, trace, collapsed_result, method, mode, best_indx, nr, bin_iv)
 {
   if(!is.na(bin_iv)) bin_iv <- round((bin_iv - trace[nr - 1,4]) / bin_iv * 100, 2)

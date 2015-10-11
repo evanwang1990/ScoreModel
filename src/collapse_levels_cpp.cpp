@@ -148,25 +148,25 @@ List CollapseZeroCells(NumericMatrix freqMatrix, IntegerMatrix trace, String mod
     if(zeroflag > 0) break;
   }
 
-  if(zeroflag == 0 or nrow < 2 or iter > 10) return(List::create(Named("freqMatrix") = freqMatrix,
-                                                          Named("label.trace") = trace));
+  if(zeroflag == 0 or nrow < 2 or iter > 100) return(List::create(Named("freqMatrix") = freqMatrix,
+                                                                  Named("label.trace") = trace));
 
   NumericVector good = freqMatrix.column(0);
   NumericVector bad  = freqMatrix.column(1);
 
-  int left = -1, right = -1;
+  int left = -1, right = -1;     //calculate the left and right which will be collapsed
   if(mode == "J")
   {
     if(row == 0) left = row;    //the first row
     else if(row == nrow - 1) left = row - 1;    //the last row
     else
     {
-      if(freqMatrix(row + 1, col) == 0)    //if the nextrow also has zero in the same cells
-      {                                    //collapse them directly, because can not use "iv","ll" methods
+      if(freqMatrix(row + 1, col) == 0)    //if the next row also has zero in the same column
+      {                                    //collapse them directly, because can not use "max_iv","max_likehood" methods
         left = row;
       }
-      else if(freqMatrix(row + 1, 1 - col) == 0)    //if the nextrow has zero in the different cells
-      {                                             //collapse the frontrow directly
+      else if(freqMatrix(row + 1, 1 - col) == 0)    //if the next row has zero in the different column
+      {                                             //collapse the front row directly
         left = row - 1;
       }
       else
@@ -188,10 +188,10 @@ List CollapseZeroCells(NumericMatrix freqMatrix, IntegerMatrix trace, String mod
       {
         if(freqMatrix(row_, col) == 0)
         {
-          right = row_;    //preferentialy collapse the levels which have the same zero cells
+          right = row_;    //preferentialy collapse the levels which have zero in the same column
           break;
         }
-        else if(freqMatrix(row_, 1 - col) > 0)  //make sure not to collapse the levels which has zero in different cells
+        else if(freqMatrix(row_, 1 - col) > 0)  //make sure not to collapse the levels which has zero in different column
         {
           double delta_ = delta_zerocell(good, bad, row, row_);
           if(delta_ < min_delta)
@@ -202,10 +202,10 @@ List CollapseZeroCells(NumericMatrix freqMatrix, IntegerMatrix trace, String mod
         }
       }
     }
+    if(right == -1) return(List::create(Named("freqMatrix") = freqMatrix,    //in mode "A", there will be two levels and
+                                        Named("label.trace") = trace));      //the diagnol elements are zeros
   }
 
-  if(right == -1) return(List::create(Named("freqMatrix") = freqMatrix,    //in mode "A", there will be two levels and
-                                      Named("label.trace") = trace));        //the diagnol element are zeros
 
   NumericMatrix freqMatrix_ = combine(freqMatrix, left, right);
   trace(iter, 0) = left;

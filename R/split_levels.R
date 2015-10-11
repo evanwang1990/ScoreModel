@@ -56,33 +56,13 @@ splitLevel <- function(formula, df, minp = 0.05)
   if(any(is.na(x))) band <- c(band, 'missing')
 
   #get the detail of split result
-  splitResult <- dcast(as.data.frame(table(x_, y, useNA = 'ifany')), x_ ~ y, value.var = 'Freq', fill = 0)
-  setDT(splitResult)
-  setnames(splitResult, c('x_', 'CntGood', 'CntBad'))
-  splitResult[, `:=`(x_     = NULL,
-                     band   = band,
-                     CntRec = CntGood + CntBad)
-              ][, `:=`(PctRec   = paste0(round(CntRec / sum(CntRec) * 100, 2), '%'),
-                       GoodRate = paste0(round(CntGood / CntRec * 100, 2), '%'),
-                       BadRate  = paste0(round(CntBad / CntRec * 100, 2), '%'),
-                       WoE      = ifelse(CntBad == 0, -4,
-                                         ifelse(CntGood == 0, 4,
-                                                round(log(CntBad / sum(CntBad)) - log(CntGood / sum(CntGood)), 4))))
-                ][, `:=`(IV          = round(WoE * (CntBad / sum(CntBad) - CntGood / sum(CntGood)), 4),
-                         WoE_barplot = barplot.woe(WoE))]
-  setcolorder(splitResult, c('band', 'CntRec', 'PctRec', 'CntGood', 'CntBad', 'GoodRate', 'BadRate', 'WoE', 'IV', 'WoE_barplot'))
-  if(!(is.numeric(x) || is.ordered(x))) setorder(splitResult, 'IV')
-  splitResult <- rbind(splitResult,
-                       data.frame(band        = 'Total',
-                                  CntRec      = sum(splitResult$CntRec),
-                                  PctRec      = '100%',
-                                  CntGood     = sum(splitResult$CntGood),
-                                  CntBad      = sum(splitResult$CntBad),
-                                  GoodRate    = paste0(round(sum(splitResult$CntGood) / sum(splitResult$CntRec) * 100, 2), '%'),
-                                  BadRate     = paste0(round(sum(splitResult$CntBad) / sum(splitResult$CntRec) * 100, 2), '%'),
-                                  WoE         = 0,
-                                  IV          = sum(splitResult$IV),
-                                  WoE_barplot = ''))
+  splitResult <- table_matrix(x_, y, useNA = 'ifany')
+  setDT(splitResult, keep.rownames = F)
+  setnames(splitResult, c('CntGood', 'CntBad'))
+  splitResult[, band := band]
+  setorder(splitResult, c('band', 'CntGood', 'CntBad'))
+  mode <- ifelse(is.numeric(x) || is.ordered(x), 'J', 'A')
+  splitResult <- detail.woe(splitResult, mode)
 
   #linearity
   is.linear <- NA
@@ -92,15 +72,17 @@ splitLevel <- function(formula, df, minp = 0.05)
     is.linear <- linearity(freqMatrix[,1], freqMatrix[,2]) < 1e-6
   }
 
-  return(list('summary' = data.frame('var'             = deparse(elem[[3]]),
-                                     'class'          = class(x),
-                                     'PctNA'          = round(sum(is.na(x)) / length(x), 3),
-                                     'levels'         = nrow(splitResult) - 1 - any(is.na(x)),
-                                     'IV'             = max(splitResult$IV),
-                                     'IV_decrease'    = 0,
-                                     'is.linear'      = is.linear,
-                                     'is.suboptional' = FALSE,
-                                     'method'         = 'ctree',
-                                     'detail'         = ''),
-              'detail'  = splitResult[1:(nrow(splitResult) - 1)]))
+  WoE_result <- list('summary' = data.frame('var'             = deparse(elem[[3]]),
+                                            'class'          = class(x),
+                                            'PctNA'          = round(sum(is.na(x)) / length(x), 3),
+                                            'levels'         = nrow(splitResult) - 1 - any(is.na(x)),
+                                            'IV'             = max(splitResult$IV),
+                                            'IV_decrease'    = 0,
+                                            'is.linear'      = is.linear,
+                                            'is.suboptional' = FALSE,
+                                            'method'         = 'ctree',
+                                            'mode'           = mode,
+                                            'detail'         = ''),
+                     'detail'  = splitResult[1:(nrow(splitResult) - 1)])
+  WoE_result
 }

@@ -1,10 +1,12 @@
-print.woe <- function(trace, best_index, binary_IV, WoE_result)
+#trace, best_index, binary_IV, WoE_result
+print.woe <- function(WoE_result)
 {
   cat('Predictor = ', WoE_result$summary$var, ', Method = ', WoE_result$summary$method, ', Mode = ', WoE_result$summary$mode, '\n\n', sep = '')
   cat(paste0(rep('-', 100), collapse = ''), '\n')
 
   # print trace
-  if(WoE_result$summary$method != 'ctree')
+  trace <- WoE_result$trace
+  if(!is.null(trace))
   {
     row_names <- rownames(trace)
     row_names[best_index] <- paste0(row_names[best_index], '*')

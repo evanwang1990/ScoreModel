@@ -39,7 +39,7 @@ collapseLevel <- function(x, y, org.levels, method, mode, minp = 0.05, ...)
     x_ <- as.character(x)
   }
 
-  freqMatrix <- as.matrix(table(x_, y))
+  freqMatrix <- table_matrix(x_, y, useNA = 'no')
   if(is.numeric(x))
   {
     labels <- rownames(freqMatrix)
@@ -51,45 +51,57 @@ collapseLevel <- function(x, y, org.levels, method, mode, minp = 0.05, ...)
   # deal with the zero cells
   if(any(freqMatrix == 0))
   {
-    freqMatrix_nonzero <- CollapseZeroCells(freqMatrix, matrix(NA, ncol = 2, nrow = nrow(freqMatrix)), mode = mode)
+    freqMatrix <- CollapseZeroCells(freqMatrix, matrix(NA, ncol = 2, nrow = nrow(freqMatrix)), mode = mode)
     # after processing, check if there is still zero cells
-    if(any(freqMatrix_nonzero$freqMatrix == 0))
+    if(any(freqMatrix$freqMatrix == 0))
     {
-      warning("There are zeros in some cells!\n")
-      return(list("need_mo" = FALSE,
-                  "main"    = data.frame(var         = deparse(substitute(x)),
-                                         class       = class(x),
-                                         NAs         = sum(is.na(x))/length(x),
-                                         iv          = NA,
-                                         levels      = NA,
-                                         linear      = NA,
-                                         suboptional = NA,
-                                         method      = method,
-                                         detail      = 'zero cells')))
+      freqMatrix <- data.table(freqMatrix, keep.rownames = T)
+      setnames(freqMatrix, c('band', 'CntGood', 'CntBad'))
+      freqMatrix[, band := band.collapse(x, x_, band)]
+      setorder(freqMatrix, c('band', 'CntGood', 'CntBad'))
+      if (any(is.na(x)))
+        freqMatrix <- cbind(freqMatrix,
+                                    data.frame(band    = 'missing',
+                                               CntGood = sum(is.na(x) & y == 0),
+                                               CntBad  = sum(is.na(x) & y == 1)))
+      freqMatrix <- detail.woe(freqMatrix, mode)
+      WoE_result <- list('summary' = data.frame('var'            = deparse(substitute(x)),
+                                                'class'          = class(x),
+                                                'PctNA'          = round(sum(is.na(x)) / length(x), 3),
+                                                'levels'         = NA,
+                                                'IV'             = NA,
+                                                'IV_decrease'    = NA,
+                                                'is.linear'      = NA,
+                                                'is.suboptional' = NA,
+                                                'method'         = method,
+                                                'mode'           = mode,
+                                                'detail'         = 'zero cells'),
+                         'detail'  = freqMatrix,
+                         'trace'   = NULL)
+      return(WoE_result)
     }
-
-    #update labels of freqMatrix
-    new_labels <- GetGroups(labels, freqMatrix_nonzero$label.trace[!is.na(freqMatrix_nonzero$label.trace[,1]),1], freqMatrix_nonzero$label.trace[!is.na(freqMatrix_nonzero$label.trace[,2]),2])
-    freqMatrix <- freqMatrix_nonzero$freqMatrix
-    rownames(freqMatrix) <- new_labels[new_labels != " "]
   }
 
   #check nrow
   nr <- nrow(freqMatrix)
   if(nr > 1)
   {
-    trace <- matrix(nrow = nr,
-                    ncol = 13,
-                    dimnames = list(paste("Step", 0:(nr - 1)),
-                                    c('Left', 'Right', 'minCount', 'max_iv', 'IV_decrease', 'X_stat', 'C_stat', 'Adjust_lift', 'Log_likehood', 'Prob(LR_Chi_Sq)', 'Z_score_of_log_odds_ratio', 'Prob(z_score)', 'Method')))
+    row_names <- paste("Step", 0:(nr - 1))
+    col_names <- c('Left', 'Right', 'minCount', 'max_iv', 'IV_decrease', 'X_stat', 'C_stat', 'Adjust_lift', 'Log_likehood', 'Prob(LR_Chi_Sq)', 'Z_score_of_log_odds_ratio', 'Prob(z_score)', 'Method')
+    trace <- matrix(nrow = nr, ncol = 13, dimnames = list(row_names, col_names))
     trace <- Collapse(freqMatrix, trace, 1, method, mode)
 
     #choose the best collapse
     trace[-1, 10] <- 1 - pchisq(-2 * (trace[-1, 9] - trace[1, 9]), 1:(nr - 1))
     trace[-1, 12] <- 1 - 2 * abs(pnorm(trace[-1, 11]) - 0.5)
-    bin_iv <- trace[1, 12]
+    binary_IV <- trace[1, 12]
     trace[1, 12] <- 1
     best_indx <- max(min(which.max(trace[, 10] < 0.05) - 1, which.max(trace[, 12] < 0.05) - 1), which.max(trace[, 3] >= minp * length(x)))
+    #star the best step in rownames
+    row_names[best_indx] <- paste0(row_names[best_indx], '*')
+    width <- max(nchar(row_names))
+    row_names <- sapply(row_names, function(string) paste0(c(string, rep(' ', width - nchar(string))), collapse = ''))
+    rownames(trace) <- row_names
 
     #get collapsed result----
     if(best_indx == 1){

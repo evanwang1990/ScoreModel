@@ -57,15 +57,15 @@ splitLevel <- function(formula, df, minp = 0.05)
 
   #get the detail of split result
   splitResult <- table_matrix(x_, y, useNA = 'ifany')
-  setDT(splitResult, keep.rownames = F)
+  splitResult <- data.table(splitResult, keep.rownames = F)
   setnames(splitResult, c('CntGood', 'CntBad'))
   splitResult[, band := band]
-  setorder(splitResult, c('band', 'CntGood', 'CntBad'))
+  setcolorder(splitResult, c('band', 'CntGood', 'CntBad'))
   mode <- ifelse(is.numeric(x) || is.ordered(x), 'J', 'A')
   splitResult <- detail.woe(splitResult, mode)
 
   #linearity
-  is.linear <- NA
+  is.linear <- TRUE
   if(is.numeric(x) || is.ordered(x))
   {
     freqMatrix <- as.matrix(prop.table(table(x_, y, useNA = 'no'), 2))

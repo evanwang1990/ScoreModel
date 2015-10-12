@@ -129,7 +129,7 @@ double binary_split(NumericMatrix freqMatrix)
 }
 
 //[[Rcpp::export]]
-List CollapseZeroCells(NumericMatrix freqMatrix, IntegerMatrix trace, String mode, int iter = 0)
+NumericMatrix CollapseZeroCells(NumericMatrix freqMatrix, IntegerMatrix trace, String mode, int iter = 0)
 {
   int nrow = freqMatrix.rows();
 
@@ -148,8 +148,7 @@ List CollapseZeroCells(NumericMatrix freqMatrix, IntegerMatrix trace, String mod
     if(zeroflag > 0) break;
   }
 
-  if(zeroflag == 0 or nrow < 2 or iter > 100) return(List::create(Named("freqMatrix") = freqMatrix,
-                                                                  Named("label.trace") = trace));
+  if(zeroflag == 0 or nrow < 2 or iter > 100) return(freqMatrix);
 
   NumericVector good = freqMatrix.column(0);
   NumericVector bad  = freqMatrix.column(1);
@@ -202,14 +201,17 @@ List CollapseZeroCells(NumericMatrix freqMatrix, IntegerMatrix trace, String mod
         }
       }
     }
-    if(right == -1) return(List::create(Named("freqMatrix") = freqMatrix,    //in mode "A", there will be two levels and
-                                        Named("label.trace") = trace));      //the diagnol elements are zeros
+    if(right == -1) return(freqMatrix);      //in mode "A", there will be two levels and the diagnol elements are zeros
   }
 
 
   NumericMatrix freqMatrix_ = combine(freqMatrix, left, right);
-  trace(iter, 0) = left;
-  trace(iter, 1) = right;
+  List dimnames = freqMatrix.attr("dimnames");
+  StringVector labels = dimnames[0];
+  combineLabels(labels, left, right);
+  StringVector labels_(freqMatrix_.nrow());
+  for(int i = 0; i < freqMatrix_.nrow(); ++ i) labels_[i] = labels[i];
+  freqMatrix_.attr("dimnames") = List::create(labels_, dimnames[1]);
   iter ++;
   return(CollapseZeroCells(freqMatrix_, trace, mode, iter));
 }
@@ -220,7 +222,7 @@ NumericMatrix combineResults(NumericMatrix freqMatrix, NumericVector left, Numer
 {
   NumericMatrix freqMatrix_ = clone(freqMatrix);
   List dimnames             = freqMatrix_.attr("dimnames");
-  StringVector labels      = dimnames[0];
+  StringVector labels       = dimnames[0];
   if(labels.size() == 1) return freqMatrix_;
   for(int i = 0; i < left.size(); ++i)
   {

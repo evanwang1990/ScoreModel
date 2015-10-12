@@ -83,6 +83,7 @@ splitLevel <- function(formula, df, minp = 0.05)
                                             'method'         = 'ctree',
                                             'mode'           = mode,
                                             'detail'         = ''),
-                     'detail'  = splitResult[1:(nrow(splitResult) - 1)])
+                     'detail' = splitResult[1:(nrow(splitResult) - 1)],
+                     'trace'  = NULL)
   WoE_result
 }

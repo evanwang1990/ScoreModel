@@ -6,7 +6,8 @@ chileancredit.train$FlagGB[FlagGB == 1 & Performance == '70: Never delinquent' &
 chileancredit.train$FlagGB[FlagGB == 1 & Performance == '62: 1 x 1-29' & runif(length(FlagGB)) < 0.05] <- 0
 chileancredit.train$FlagGB[FlagGB == 0 & Performance == '20: 1+ x 90+' & runif(length(FlagGB)) < 0.05] <- 1
 detach(chileancredit.train)
-splitLevel(FlagGB ~ factor(Performance), chileancredit.train)
+splitLevel(FlagGB ~ Performance, chileancredit.train)
+collapseLevel(FlagGB ~ TOB, chileancredit.train, org.levels = 20, mode = 'J', method = 'max_iv')
 
 with(chileancredit.train, table(Performance, FlagGB))
 chileancredit.train <- within(chileancredit.train, Performance <- factor(as.character(Performance), ordered = F))

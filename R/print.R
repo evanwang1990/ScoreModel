@@ -10,7 +10,7 @@ print.woe <- function(WoE_result)
     trace <- data.frame(trace, row.names = row_names, stringsAsFactors = F)
     setDT(trace, keep.rownames = T)
     setnames(trace, 'rn', paste0(c('Step', rep(' ', max(nchar(trace[[1]])) - 4)), collapse = ''))
-    trace[, `:=`(IV             = round(IV, 4),
+    trace[, `:=`(IV              = round(IV, 4),
                  IV_decrease     = paste0(round(IV_decrease, 2), '%'),
                  X_stat          = round(X_stat, 4),
                  C_stat          = round(C_stat, 4),

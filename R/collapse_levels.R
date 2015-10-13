@@ -48,7 +48,7 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
 
   if(is.numeric(x))
   {
-    x_ <- cut(rank(x, ties.method = 'min', na.last = "keep"), breaks = levels, labels = F)
+    x_ <- cut(rank(x, ties.method = 'min', na.last = "keep"), breaks = org.levels, labels = F)
   }else{
     x_ <- as.character(x)
   }
@@ -67,7 +67,7 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
   {
     freqMatrix <- CollapseZeroCells(freqMatrix, matrix(NA, ncol = 2, nrow = nrow(freqMatrix)), mode = mode)
     # after processing, check if there is still zero cells
-    if(any(freqMatrix$freqMatrix == 0))
+    if(any(freqMatrix == 0))
     {
       freqMatrix <- data.table(freqMatrix, keep.rownames = T)
       setnames(freqMatrix, c('band', 'CntGood', 'CntBad'))
@@ -89,7 +89,8 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
                                                 'is.suboptional' = NA,
                                                 'method'         = method,
                                                 'mode'           = mode,
-                                                'detail'         = 'zero cells'),
+                                                'detail'         = 'zero cells',
+                                                stringsAsFactors = F),
                          'detail'  = detail[1:(nrow(detail) - 1)],
                          'trace'   = NULL)
       return(WoE_result)
@@ -101,7 +102,7 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
   if(nr > 1)
   {
     row_names <- paste("Step", 0:(nr - 1))
-    col_names <- c('Left', 'Right', 'minCount', 'max_iv', 'IV_decrease', 'X_stat', 'C_stat', 'Adjust_lift', 'Log_likehood', 'Prob(LR_Chi_Sq)', 'Z_score_of_log_odds_ratio', 'Prob(z_score)', 'Method')
+    col_names <- c('Left', 'Right', 'minCount', 'IV', 'IV_decrease', 'X_stat', 'C_stat', 'Adjust_lift', 'Log_likehood', 'Prob(LR_Chi_Sq)', 'Z_score_of_log_odds_ratio', 'Prob(z_score)', 'Method')
     trace <- matrix(nrow = nr, ncol = 13, dimnames = list(row_names, col_names))
     trace <- Collapse(freqMatrix, trace, 1, method, mode)
 
@@ -128,7 +129,7 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
     collapsed_result[, band := band.collapse(x, x_, band)]
     setcolorder(collapsed_result, c('band', 'CntGood', 'CntBad'))
     if (any(is.na(x)))
-        collapsed_result <- cbind(collapsed_result,
+        collapsed_result <- rbind(collapsed_result,
                                   data.frame(band    = 'missing',
                                              CntGood = sum(is.na(x) & y == 0),
                                              CntBad  = sum(is.na(x) & y == 1)))
@@ -140,11 +141,12 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
                                               'levels'         = nrow(detail) - 1 - any(is.na(x)),
                                               'IV'             = max(detail$IV),
                                               'IV_decrease'    = ifelse(is.null(IV_ctree), NA, round((max(detail$IV) - IV_ctree) / IV_ctree, 3)),
-                                              'is.linear'      = ifelse(mode == 'J', trace[best_indx, 8] < 1e-6, NA),
-                                              'is.suboptional' = ifelse(mode == 'J', round((binary_IV - trace[nr - 1,4]) / bin_iv * 100, 1e-3), NA),
+                                              'is.linear'      = ifelse(mode == 'J', trace[best_indx, 8] < 1e-6, TRUE),
+                                              'is.suboptional' = ifelse(mode == 'J', round((binary_IV - trace[nr - 1,4]) / binary_IV * 100, 1e-3), NA),
                                               'method'         = method,
                                               'mode'           = mode,
-                                              'detail'         = ''),
+                                              'detail'         = '',
+                                              stringsAsFactors = F),
                        'detail'  = detail[1:(nrow(detail) - 1)],
                        'trace'   = trace)
   }else if(any(is.na(x))){
@@ -168,7 +170,8 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
                                                 'is.suboptional' = NA,
                                                 'method'         = method,
                                                 'mode'           = 'A',
-                                                'detail'         = 'one level'),
+                                                'detail'         = 'one level',
+                                                stringsAsFactors = F),
                          'detail'  = detail[1:(nrow(detail) - 1)],
                          'trace'   = NULL)
     }

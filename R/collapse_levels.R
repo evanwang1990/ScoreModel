@@ -9,6 +9,7 @@
 #setcolorder
 #对于其中的缺失值,求WOE
 #WOE计算反了
+#check the condition of two rows
 
 band.collapse <- function(x, x_, band_)
 {
@@ -18,8 +19,14 @@ band.collapse <- function(x, x_, band_)
   res
 }
 
-collapseLevel <- function(x, y, org.levels, method, mode, minp = 0.05, ...)
+collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ...)
 {
+  args <- list(...) #IV_ctree, skip.check
+  #updating
+  if (is.null(args[['skip.check']]))
+  {
+    if (is.character(formula)) formula <- as.formula(formula)
+  }
   if(is.character(x) || (is.factor(x) && !is.ordered(x)))
   {
     if(method == 'linear')
@@ -133,29 +140,28 @@ collapseLevel <- function(x, y, org.levels, method, mode, minp = 0.05, ...)
                                               'method'         = method,
                                               'mode'           = mode,
                                               'detail'         = ''),
-                       'detail'  = collapsed_result[1:(nrow(collapsed_result) - 1)])
-    #print trace----
-    print.woe(trace = trace, best_index = best_indx, binary_IV = binary_IV, WoE_result = WoE_result)
-
-  }else if(any(is.na(x))){  #the one level variables make sense only when they have missing values(just as two levels)
-    stringcode <- stringCode(x, y, x_, deparse(substitute(x)), paste0("'",rownames(freqMatrix),"'"), !missing(sqlfile), method)
-    writeLines(stringcode[1], sourcefile, sep = ',\n')
-    if(!missing(sqlfile)) writeLines(stringcode[2], sqlfile)
-    return(list("need_mo" = FALSE,
-                "main"    = data.frame(var         = deparse(substitute(x)),
-                                       class       = class(x),
-                                       NAs         = sum(is.na(x))/length(x),
-                                       iv          = 0,
-                                       levels      = 1,
-                                       linear      = ifelse(mode == 'J', trace[best_indx, 8] < 1e-6, NA),
-                                       suboptional = 0,
-                                       method      = method,
-                                       detail      = 'one-level')))
+                       'detail'  = collapsed_result[1:(nrow(collapsed_result) - 1)],
+                       'trace'   = trace)
+  }else if(any(is.na(x))){
+    #variable with two levels, missing and non-missing(after collapsing zeros)
+    #if there is significant difference between missing and non-missing, output
+    p.value <- chisq.test(table(is.na(x), y))$p.value
+    if (p.value < 0.05)
+    {
+      #updating
+      WoE_result <- list('summary' = data.frame('var'            = deparse(substitute(x)),
+                                                'class'          = class(x),
+                                                'PctNA'          = round(sum(is.na(x)) / length(x), 3),
+                                                'levels'         = nrow(collapsed_result) - 1 - any(is.na(x)),
+                                                'IV'             = max(collapsed_result$IV),
+                                                'IV_decrease'    = ifelse(is.null(IV_ctree), NA, round((max(collapsed_result$IV) - IV_ctree) / max(collapsed_result$IV), 3)),
+                                                'is.linear'      = ifelse(mode == 'J', trace[best_indx, 8] < 1e-6, NA),
+                                                'is.suboptional' = ifelse(mode == 'J', round((binary_IV - trace[nr - 1,4]) / bin_iv * 100, 1e-3), NA),
+                                                'method'         = method,
+                                                'mode'           = mode,
+                                                'detail'         = ''),
+                         'detail'  = collapsed_result[1:(nrow(collapsed_result) - 1)],
+                         'trace'   = trace)
+    }
   }
-}
-
-
-test <- function(...)
-{
-  list(...)
 }

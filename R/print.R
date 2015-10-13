@@ -1,4 +1,3 @@
-#trace, best_index, binary_IV, WoE_result
 print.woe <- function(WoE_result)
 {
   cat('Predictor = ', WoE_result$summary$var, ', Method = ', WoE_result$summary$method, ', Mode = ', WoE_result$summary$mode, '\n\n', sep = '')
@@ -8,13 +7,9 @@ print.woe <- function(WoE_result)
   trace <- WoE_result$trace
   if(!is.null(trace))
   {
-    row_names <- rownames(trace)
-    row_names[best_index] <- paste0(row_names[best_index], '*')
-    width <- max(nchar(row_names))
-    row_names <- sapply(row_names, function(string) paste0(c(string, rep(' ', width - nchar(string))), collapse = ''))
     trace <- data.frame(trace, row.names = row_names, stringsAsFactors = F)
     setDT(trace, keep.rownames = T)
-    setnames(trace, 'rn', paste0(c('Step', rep(' ', width - 4)), collapse = ''))
+    setnames(trace, 'rn', paste0(c('Step', rep(' ', max(nchar(trace[[1]])) - 4)), collapse = ''))
     trace[, `:=`(IV             = round(IV, 4),
                  IV_decrease     = paste0(round(IV_decrease, 2), '%'),
                  X_stat          = round(X_stat, 4),
@@ -31,15 +26,12 @@ print.woe <- function(WoE_result)
       cat('\nAt last step the iv decrease ', binary_IV, '% from the maximum binary-split-iv.', sep = '')
       if (binary_IV > 5) cat(" The collapse process seems become suboptional.\n") else cat('\n')
     }
-    cat('The best collapse is at', trace[[1]][best_index])
-    if(!WoE_result$summary$is.linear) cat(', but it seems not be linear.\n') else cat('.\n\n')
-  }else{
-    if(!WoE_result$summary$is.linear) cat('It seems not be linear using ctree split method.\n\n')
   }
 
   #print WoE_result
   cat('The result of WoE:\n')
   print(WoE_result$detail, right = T, row.names = F)
   cat('\n')
+  if(!WoE_result$summary$is.linear) cat('It seems not to be linear.\n')
   cat(paste0(rep('=', 100), collapse = ''), '\n\n')
 }

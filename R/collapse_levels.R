@@ -6,7 +6,7 @@
 #'res <- bestCollapse(c('x1', 'x2'), y, df, 20, method = 'max_iv', mode = 'J', tracefile = 'trace.Rout', sqlfile = 'sql_code.sql')
 #'collapseLevel(x = df$x2, y = df$y, levels = 20, method = 'max_iv', mode = 'A', minp = 0.05, sourcefile = 'test.R', sqlfile = 'test.sql')
 
-#setcolorder
+
 #对于其中的缺失值,求WOE
 #WOE计算反了
 #check the condition of two rows
@@ -22,11 +22,18 @@ band.collapse <- function(x, x_, band_)
 collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ...)
 {
   args <- list(...) #IV_ctree, skip.check
-  #updating
+  IV_ctree <- args[['IV_ctree']]
   if (is.null(args[['skip.check']]))
   {
     if (is.character(formula)) formula <- as.formula(formula)
+    if (class(formula) != 'formula') stop("Formula is not correct.")
+    if (any(!all.vars(formula) %in% names(df))) stop("Variables in formula is not in df.")
   }
+
+  elem <- as.list(formula)
+  x <- eval(elem[[3]], df, parent.frame())
+  y <- eval(elem[[2]], df, parent.frame())
+
   if(is.character(x) || (is.factor(x) && !is.ordered(x)))
   {
     if(method == 'linear')
@@ -65,14 +72,14 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
       freqMatrix <- data.table(freqMatrix, keep.rownames = T)
       setnames(freqMatrix, c('band', 'CntGood', 'CntBad'))
       freqMatrix[, band := band.collapse(x, x_, band)]
-      setorder(freqMatrix, c('band', 'CntGood', 'CntBad'))
+      setcolorder(freqMatrix, c('band', 'CntGood', 'CntBad'))
       if (any(is.na(x)))
         freqMatrix <- cbind(freqMatrix,
                                     data.frame(band    = 'missing',
                                                CntGood = sum(is.na(x) & y == 0),
                                                CntBad  = sum(is.na(x) & y == 1)))
-      freqMatrix <- detail.woe(freqMatrix, mode)
-      WoE_result <- list('summary' = data.frame('var'            = deparse(substitute(x)),
+      detail <- detail.woe(freqMatrix, mode)
+      WoE_result <- list('summary' = data.frame('var'            = deparse(elem[[3]]),
                                                 'class'          = class(x),
                                                 'PctNA'          = round(sum(is.na(x)) / length(x), 3),
                                                 'levels'         = NA,
@@ -83,7 +90,7 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
                                                 'method'         = method,
                                                 'mode'           = mode,
                                                 'detail'         = 'zero cells'),
-                         'detail'  = freqMatrix,
+                         'detail'  = detail[1:(nrow(detail) - 1)],
                          'trace'   = NULL)
       return(WoE_result)
     }
@@ -119,28 +126,26 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
     collapsed_result <- data.table(collapsed_result, keep.rownames = T)
     setnames(collapsed_result, c('band', 'CntGood', 'CntBad'))
     collapsed_result[, band := band.collapse(x, x_, band)]
-    setorder(collapsed_result, c('band', 'CntGood', 'CntBad'))
+    setcolorder(collapsed_result, c('band', 'CntGood', 'CntBad'))
     if (any(is.na(x)))
         collapsed_result <- cbind(collapsed_result,
                                   data.frame(band    = 'missing',
                                              CntGood = sum(is.na(x) & y == 0),
                                              CntBad  = sum(is.na(x) & y == 1)))
-    collapsed_result <- detail.woe(collapsed_result, mode)
+    detail <- detail.woe(collapsed_result, mode)
 
-    args <- list(...)
-    IV_ctree <- args[['IV_ctree']]
-    WoE_result <- list('summary' = data.frame('var'             = deparse(substitute(x)),
+    WoE_result <- list('summary' = data.frame('var'            = deparse(elem[[3]]),
                                               'class'          = class(x),
                                               'PctNA'          = round(sum(is.na(x)) / length(x), 3),
-                                              'levels'         = nrow(collapsed_result) - 1 - any(is.na(x)),
-                                              'IV'             = max(collapsed_result$IV),
-                                              'IV_decrease'    = ifelse(is.null(IV_ctree), NA, round((max(collapsed_result$IV) - IV_ctree) / max(collapsed_result$IV), 3)),
+                                              'levels'         = nrow(detail) - 1 - any(is.na(x)),
+                                              'IV'             = max(detail$IV),
+                                              'IV_decrease'    = ifelse(is.null(IV_ctree), NA, round((max(detail$IV) - IV_ctree) / IV_ctree, 3)),
                                               'is.linear'      = ifelse(mode == 'J', trace[best_indx, 8] < 1e-6, NA),
                                               'is.suboptional' = ifelse(mode == 'J', round((binary_IV - trace[nr - 1,4]) / bin_iv * 100, 1e-3), NA),
                                               'method'         = method,
                                               'mode'           = mode,
                                               'detail'         = ''),
-                       'detail'  = collapsed_result[1:(nrow(collapsed_result) - 1)],
+                       'detail'  = detail[1:(nrow(detail) - 1)],
                        'trace'   = trace)
   }else if(any(is.na(x))){
     #variable with two levels, missing and non-missing(after collapsing zeros)
@@ -148,20 +153,24 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
     p.value <- chisq.test(table(is.na(x), y))$p.value
     if (p.value < 0.05)
     {
-      #updating
-      WoE_result <- list('summary' = data.frame('var'            = deparse(substitute(x)),
+      x_ <- factor(is.na(x), levels = c(TRUE, FALSE), labels = c('missing', 'nomissing'))
+      freqMatrix <- table_matrix(x_, y)
+      freqMatrix <- data.table(freqMatrix, keep.rownames = T)
+      setnames(freqMatrix, c('band', 'CntGood', 'CntBad'))
+      detail <- detail.woe(freqMatrix, 'A')
+      WoE_result <- list('summary' = data.frame('var'            = deparse(elem[[3]]),
                                                 'class'          = class(x),
                                                 'PctNA'          = round(sum(is.na(x)) / length(x), 3),
-                                                'levels'         = nrow(collapsed_result) - 1 - any(is.na(x)),
-                                                'IV'             = max(collapsed_result$IV),
-                                                'IV_decrease'    = ifelse(is.null(IV_ctree), NA, round((max(collapsed_result$IV) - IV_ctree) / max(collapsed_result$IV), 3)),
-                                                'is.linear'      = ifelse(mode == 'J', trace[best_indx, 8] < 1e-6, NA),
-                                                'is.suboptional' = ifelse(mode == 'J', round((binary_IV - trace[nr - 1,4]) / bin_iv * 100, 1e-3), NA),
+                                                'levels'         = 1,
+                                                'IV'             = max(detail$IV),
+                                                'IV_decrease'    = ifelse(is.null(IV_ctree), NA, round((max(detail$IV) - IV_ctree) / IV_ctree, 3)),
+                                                'is.linear'      = NA,
+                                                'is.suboptional' = NA,
                                                 'method'         = method,
-                                                'mode'           = mode,
-                                                'detail'         = ''),
-                         'detail'  = collapsed_result[1:(nrow(collapsed_result) - 1)],
-                         'trace'   = trace)
+                                                'mode'           = 'A',
+                                                'detail'         = 'one level'),
+                         'detail'  = detail[1:(nrow(detail) - 1)],
+                         'trace'   = NULL)
     }
   }
 }

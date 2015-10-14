@@ -9,6 +9,8 @@ catLog.woe.result <- function(WoE_result)
   trace <- WoE_result$trace
   if(!is.null(trace))
   {
+    binary_IV <- trace[1, 12]
+    trace[1, 12] <- 1
     trace <- data.frame(trace, row.names = rownames(trace), stringsAsFactors = F)
     setDT(trace, keep.rownames = T)
     setnames(trace, 'rn', paste0(c('Step', rep(' ', max(nchar(trace[[1]])) - 4)), collapse = ''))

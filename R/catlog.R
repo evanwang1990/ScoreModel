@@ -35,8 +35,8 @@ catLog.woe.result <- function(WoE_result)
   cat('The result of WoE:\n')
   print(WoE_result$detail, right = T, row.names = F)
   cat('\n')
-  if(!WoE_result$summary$is.linear) cat('It seems NOT to be linear.\n')
-  else cat('It is linear.\n')
+  if(!WoE_result$summary$is.linear) cat('## It seems NOT to be linear.\n')
+  else cat('## It is linear.\n')
   cat(paste0(rep('=', 100), collapse = ''), '\n\n\n\n')
 }
 

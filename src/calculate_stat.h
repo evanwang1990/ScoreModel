@@ -104,10 +104,10 @@ void combineLabels(StringVector names, int i, int j)
   names[names.size() - 1] = " ";
 }
 
-double delta(NumericVector good, NumericVector bad, int i, int j, String method = "iv")
+double delta(NumericVector good, NumericVector bad, int i, int j, String method = "max_iv")
 {
   double delta_ = 9999.0;
-  if(method == "iv")
+  if(method == "max_iv")
   {
     double sum_good = sum(good);
     double sum_bad = sum(bad);
@@ -115,7 +115,7 @@ double delta(NumericVector good, NumericVector bad, int i, int j, String method 
       (good[j] / sum_good - bad[j] / sum_bad) * (log(good[j] / sum_good) - log(bad[j] / sum_bad)) -
       ((good[i] + good[j]) / sum_good - (bad[i] + bad[j]) / sum_bad) * (log((good[i] + good[j]) / sum_good) - log((bad[i] + bad[j]) / sum_bad));
   }
-  else if(method == "ll")
+  else if(method == "max_likehood")
   {
     double new_good = good[i] + good[j];
     double new_bad = bad[i] + bad[j];
@@ -123,8 +123,8 @@ double delta(NumericVector good, NumericVector bad, int i, int j, String method 
       good[j] * log(good[j] / (good[j] + bad[j])) + bad[j] * log(bad[j] / (good[j] + bad[j])) -
       (new_good * log(new_good / (new_good + new_bad)) + new_bad * log(new_bad / (new_good + new_bad)));
   }
-  // make sure that only numeric x can use "mo" method!!
-  else if(method == "mo")
+  // make sure that only numeric x can use "linear" method!!
+  else if(method == "linear")
   {
     double lo_zscore = cal_log_odds_ratio_zscore(good, bad, i, j);
     //under the condition that the two levels can be collapsed

@@ -29,7 +29,7 @@ detail.woe <- function(woe_detail, mode)
                                 CntBad      = sum(woe_detail$CntBad),
                                 GoodRate    = paste0(round(sum(woe_detail$CntGood) / sum(woe_detail$CntRec) * 100, 2), '%'),
                                 BadRate     = paste0(round(sum(woe_detail$CntBad) / sum(woe_detail$CntRec) * 100, 2), '%'),
-                                WoE         = 0,
+                                WoE         = NA,
                                 IV          = sum(woe_detail$IV),
                                 WoE_barplot = ''))
   woe_detail

@@ -5,39 +5,22 @@ attach(chileancredit.train)
 chileancredit.train$FlagGB[FlagGB == 1 & Performance == '70: Never delinquent' & runif(length(FlagGB)) < 0.05] <- 0
 chileancredit.train$FlagGB[FlagGB == 1 & Performance == '62: 1 x 1-29' & runif(length(FlagGB)) < 0.05] <- 0
 chileancredit.train$FlagGB[FlagGB == 0 & Performance == '20: 1+ x 90+' & runif(length(FlagGB)) < 0.05] <- 1
+chileancredit.train$Miss[FlagGB == 1] <- sample(c('a', NA), sum(FlagGB == 1), replace = T)
+chileancredit.train$Miss[FlagGB == 0] <- sample(c('a', rep(NA, 10)), sum(FlagGB == 0), replace = T)
 detach(chileancredit.train)
-splitLevel(FlagGB ~ Performance, chileancredit.train)
-collapseLevel(FlagGB ~ TOB, chileancredit.train, org.levels = 20, mode = 'J', method = 'max_iv')
 
-with(chileancredit.train, table(Performance, FlagGB))
-chileancredit.train <- within(chileancredit.train, Performance <- factor(as.character(Performance), ordered = F))
-ctree1 <- ctree(factor(FlagGB) ~ Performance, data = chileancredit.train)
+#factor
+catLog(splitLevel(FlagGB ~ Performance, chileancredit.train))
+catLog(collapseLevel(FlagGB ~ Performance, chileancredit.train))
 
-chileancredit.test=subset(chileancredit,FlagSample==0 & !is.na(FlagGB))
+#numeric
+catLog(splitLevel(FlagGB ~ TOB, chileancredit.train))
+catLog(collapseLevel(FlagGB ~ TOB, chileancredit.train))
 
-# Package application
-result=smbinning(df=chileancredit.train,y="FlagGB",x="TOB") # Run and save result
-result$ivtable # Tabulation and Information Value
-result$iv # Information value
-result$bands # Bins or bands
-result$ctree # Decision tree from partykit
-
-
-round <- function(x, unit)
-{
-  x_min <- floor(x/unit)*unit
-  x_ <- ifelse(x <= x_min + 0.5 * unit, x_min, x_min + unit)
-}
-
-result_1 <- collapseLevel(x = chileancredit.train$TOB, y =chileancredit.train$FlagGB, 20, method = 'iv', mode = 'J', sourcefile = 'test.R', sqlfile = 'test.sql')
-
-
-library(smbinning)
-chileancredit.train=subset(chileancredit,FlagSample==1 & !is.na(FlagGB))
-freqMatrix <- as.matrix(with(chileancredit.train, table(Performance, FlagGB)))
-freqMatrix <- freqMatrix[freqMatrix[,1] + freqMatrix[,2] > 0, ]
-CollapseZeroCells(freqMatrix, matrix(NA, 5, 2), "J")
-
+#one level with missing values
+#error!
+catLog(splitLevel(FlagGB ~ Miss, chileancredit.train))
+collapseLevel(FlagGB ~ Miss, chileancredit.train)
 
 
 tmp <- sample(20:100, 10, replace = T)

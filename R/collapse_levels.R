@@ -1,16 +1,3 @@
-#'
-#'library(process)
-#'df <- data.frame(x1 = sample(1:1000, 1e4, replace = T),
-#'                 x2 = sample(c(letters[1:3], NA), 1e4, replace = T),
-#'                 y  = c(sample(c(1, 1, 0), 5e3, replace = T), sample(c(1, 0, 0, 0), 5e3, replace = T)))
-#'res <- bestCollapse(c('x1', 'x2'), y, df, 20, method = 'max_iv', mode = 'J', tracefile = 'trace.Rout', sqlfile = 'sql_code.sql')
-#'collapseLevel(x = df$x2, y = df$y, levels = 20, method = 'max_iv', mode = 'A', minp = 0.05, sourcefile = 'test.R', sqlfile = 'test.sql')
-
-
-#对于其中的缺失值,求WOE
-#WOE计算反了
-#check the condition of two rows
-
 band.collapse <- function(x, x_, band_)
 {
   if(!is.numeric(x)) return(band_)
@@ -19,7 +6,7 @@ band.collapse <- function(x, x_, band_)
   res
 }
 
-collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ...)
+collapseLevel <- function(formula, df, org.levels = 20, method = 'max_iv', mode = 'J', minp = 0.05, ...)
 {
   args <- list(...) #IV_ctree, skip.check
   IV_ctree <- args[['IV_ctree']]
@@ -79,7 +66,7 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
                                                CntGood = sum(is.na(x) & y == 0),
                                                CntBad  = sum(is.na(x) & y == 1)))
       detail <- detail.woe(freqMatrix, mode)
-      WoE_result <- list('summary' = data.frame('var'            = deparse(elem[[3]]),
+      WoE_result <- list('summary' = data.frame('var'            = all.vars(elem[[3]]),
                                                 'class'          = class(x),
                                                 'PctNA'          = round(sum(is.na(x)) / length(x), 3),
                                                 'levels'         = NA,
@@ -91,8 +78,9 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
                                                 'mode'           = mode,
                                                 'detail'         = 'zero cells',
                                                 stringsAsFactors = F),
-                         'detail'  = detail[1:(nrow(detail) - 1)],
+                         'detail'  = detail,
                          'trace'   = NULL)
+      class(WoE_result) <- 'woe.result'
       return(WoE_result)
     }
   }
@@ -135,7 +123,7 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
                                              CntBad  = sum(is.na(x) & y == 1)))
     detail <- detail.woe(collapsed_result, mode)
 
-    WoE_result <- list('summary' = data.frame('var'            = deparse(elem[[3]]),
+    WoE_result <- list('summary' = data.frame('var'            = all.vars(elem[[3]]),
                                               'class'          = class(x),
                                               'PctNA'          = round(sum(is.na(x)) / length(x), 3),
                                               'levels'         = nrow(detail) - 1 - any(is.na(x)),
@@ -147,8 +135,10 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
                                               'mode'           = mode,
                                               'detail'         = '',
                                               stringsAsFactors = F),
-                       'detail'  = detail[1:(nrow(detail) - 1)],
+                       'detail'  = detail,
                        'trace'   = trace)
+    class(WoE_result) <- 'woe.result'
+    return(WoE_result)
   }else if(any(is.na(x))){
     #variable with two levels, missing and non-missing(after collapsing zeros)
     #if there is significant difference between missing and non-missing, output
@@ -160,20 +150,22 @@ collapseLevel <- function(formula, df, org.levels, method, mode, minp = 0.05, ..
       freqMatrix <- data.table(freqMatrix, keep.rownames = T)
       setnames(freqMatrix, c('band', 'CntGood', 'CntBad'))
       detail <- detail.woe(freqMatrix, 'A')
-      WoE_result <- list('summary' = data.frame('var'            = deparse(elem[[3]]),
+      WoE_result <- list('summary' = data.frame('var'            = all.vars(elem[[3]]),
                                                 'class'          = class(x),
                                                 'PctNA'          = round(sum(is.na(x)) / length(x), 3),
                                                 'levels'         = 1,
                                                 'IV'             = max(detail$IV),
                                                 'IV_decrease'    = ifelse(is.null(IV_ctree), NA, round((max(detail$IV) - IV_ctree) / IV_ctree, 3)),
-                                                'is.linear'      = NA,
+                                                'is.linear'      = TRUE,
                                                 'is.suboptional' = NA,
                                                 'method'         = method,
                                                 'mode'           = 'A',
                                                 'detail'         = 'one level',
                                                 stringsAsFactors = F),
-                         'detail'  = detail[1:(nrow(detail) - 1)],
+                         'detail'  = detail,
                          'trace'   = NULL)
+      class(WoE_result) <- 'woe.result'
+      return(WoE_result)
     }
   }
 }

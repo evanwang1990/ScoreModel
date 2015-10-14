@@ -2,6 +2,7 @@
 #'1、首先使用ctree得到WoE，然后对结果进行检查
 #'  1.1、连续性变量：如果notlinear，那么执行collapse算法
 
+train.woe <- function(vars, target, df, )
 bestCollapse <- function(vars,
                          target,
                          dataset,

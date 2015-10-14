@@ -6,7 +6,7 @@ band.collapse <- function(x, x_, band_)
   res
 }
 
-collapseLevel <- function(formula, df, org.levels = 20, method = 'max_iv', mode = 'J', minp = 0.05, ...)
+collapseLevel <- function(formula, df, org.levels = 20, method = c('max_iv', 'max_likehood', 'linear'), mode = 'J', minp = 0.05, ...)
 {
   args <- list(...) #IV_ctree, skip.check
   IV_ctree <- args[['IV_ctree']]
@@ -21,6 +21,7 @@ collapseLevel <- function(formula, df, org.levels = 20, method = 'max_iv', mode 
   x <- eval(elem[[3]], df, parent.frame())
   y <- eval(elem[[2]], df, parent.frame())
 
+  method <- match.arg(method)
   if(is.character(x) || (is.factor(x) && !is.ordered(x)))
   {
     if(method == 'linear')
@@ -100,6 +101,7 @@ collapseLevel <- function(formula, df, org.levels = 20, method = 'max_iv', mode 
     binary_IV <- trace[1, 12]
     trace[1, 12] <- 1
     best_indx <- max(min(which.max(trace[, 10] < 0.05) - 1, which.max(trace[, 12] < 0.05) - 1), which.max(trace[, 3] >= minp * length(x)))
+    trace[1, 12] <- binary_IV #use trace[1, 12] to re-store binary_IV which will be useful in catLog function
     #star the best step in rownames
     row_names[best_indx] <- paste0(row_names[best_indx], '*')
     width <- max(nchar(row_names))

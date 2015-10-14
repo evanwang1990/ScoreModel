@@ -1,13 +1,15 @@
-catLog <- function(WoE_result)
+catLog <- function(WoE_result) UseMethod('catLog')
+
+catLog.woe.result <- function(WoE_result)
 {
   cat('Predictor = ', WoE_result$summary$var, ', Method = ', WoE_result$summary$method, ', Mode = ', WoE_result$summary$mode, '\n\n', sep = '')
-  cat(paste0(rep('-', 100), collapse = ''), '\n')
+  cat(paste0(rep('-', 100), collapse = ''), '\n\n')
 
   # print trace
   trace <- WoE_result$trace
   if(!is.null(trace))
   {
-    trace <- data.frame(trace, row.names = row_names, stringsAsFactors = F)
+    trace <- data.frame(trace, row.names = rownames(trace), stringsAsFactors = F)
     setDT(trace, keep.rownames = T)
     setnames(trace, 'rn', paste0(c('Step', rep(' ', max(nchar(trace[[1]])) - 4)), collapse = ''))
     trace[, `:=`(IV              = round(IV, 4),
@@ -26,12 +28,19 @@ catLog <- function(WoE_result)
       cat('\nAt last step the iv decrease ', binary_IV, '% from the maximum binary-split-iv.', sep = '')
       if (binary_IV > 5) cat(" The collapse process seems become suboptional.\n") else cat('\n')
     }
+    cat(paste0(rep('-', 100), collapse = ''), '\n\n')
   }
 
   #print WoE_result
   cat('The result of WoE:\n')
   print(WoE_result$detail, right = T, row.names = F)
   cat('\n')
-  if(!WoE_result$summary$is.linear) cat('It seems not to be linear.\n')
-  cat(paste0(rep('=', 100), collapse = ''), '\n\n')
+  if(!WoE_result$summary$is.linear) cat('It seems NOT to be linear.\n')
+  else cat('It is linear.\n')
+  cat(paste0(rep('=', 100), collapse = ''), '\n\n\n\n')
+}
+
+catLog.woe.results <- function(WoE_result)
+{
+  lapply(WoE_result, catLog.woe.result)
 }

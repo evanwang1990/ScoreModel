@@ -14,7 +14,7 @@ splitLevel <- function(formula, df, minp = 0.05)
   elem <- as.list(formula)
   y <- eval(elem[[2]], df, parent.frame())
   x <- eval(elem[[3]], df, parent.frame())
-  if (is.character(x)) formula <- substitute(y ~ factor(x), list(y = elem[[2]], x = elem[[3]]))
+  if (is.character(x)) formula <- as.formula(substitute(y ~ factor(x), list(y = elem[[2]], x = elem[[3]])))
 
   split <- ctree(formula, df, na.action = na.exclude, control = ctree_control(minbucket = minp * length(x)))
   bins <- width(split)
@@ -72,7 +72,7 @@ splitLevel <- function(formula, df, minp = 0.05)
     is.linear <- linearity(freqMatrix[,1], freqMatrix[,2]) < 1e-6
   }
 
-  WoE_result <- list('summary' = data.frame('var'             = deparse(elem[[3]]),
+  WoE_result <- list('summary' = data.frame('var'            = all.vars(elem[[3]]), #elem[[3]] maybe 'factor(x)'
                                             'class'          = class(x),
                                             'PctNA'          = round(sum(is.na(x)) / length(x), 3),
                                             'levels'         = nrow(splitResult) - 1 - any(is.na(x)),
@@ -82,8 +82,10 @@ splitLevel <- function(formula, df, minp = 0.05)
                                             'is.suboptional' = FALSE,
                                             'method'         = 'ctree',
                                             'mode'           = mode,
-                                            'detail'         = ''),
-                     'detail' = splitResult[1:(nrow(splitResult) - 1)],
+                                            'detail'         = '',
+                                            stringsAsFactors = F),
+                     'detail' = splitResult,
                      'trace'  = NULL)
+  class(WoE_result) <- 'woe.result'
   WoE_result
 }

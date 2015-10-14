@@ -20,7 +20,7 @@ catLog(collapseLevel(FlagGB ~ TOB, chileancredit.train))
 #one level with missing values
 #error!
 catLog(splitLevel(FlagGB ~ Miss, chileancredit.train))
-collapseLevel(FlagGB ~ Miss, chileancredit.train)
+catLog(collapseLevel(FlagGB ~ Miss, chileancredit.train))
 
 
 tmp <- sample(20:100, 10, replace = T)

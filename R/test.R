@@ -11,14 +11,13 @@ detach(chileancredit.train)
 
 #factor
 catLog(splitLevel(FlagGB ~ Performance, chileancredit.train))
-catLog(collapseLevel(FlagGB ~ Performance, chileancredit.train))
+catLog(collapseLevel(FlagGB ~ Performance, chileancredit.train, method = "max_likehood"))
 
 #numeric
 catLog(splitLevel(FlagGB ~ TOB, chileancredit.train))
-catLog(collapseLevel(FlagGB ~ TOB, chileancredit.train))
+catLog(collapseLevel(FlagGB ~ TOB, chileancredit.train, method = "max_likehood"))
 
 #one level with missing values
-#error!
 catLog(splitLevel(FlagGB ~ Miss, chileancredit.train))
 catLog(collapseLevel(FlagGB ~ Miss, chileancredit.train))
 

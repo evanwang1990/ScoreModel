@@ -18,7 +18,7 @@ splitLevel <- function(formula, df, minp = 0.05)
 
   split <- ctree(formula, df, na.action = na.exclude, control = ctree_control(minbucket = minp * length(x)))
   bins <- width(split)
-  #total one level including missing values
+  #total one level with missing values
   if(bins == 1)
   {
     if(any(is.na(x)))
@@ -28,32 +28,32 @@ splitLevel <- function(formula, df, minp = 0.05)
     }else{
       return(NULL)
     }
-  }
-
-  #deal with the ctree result and create `band` and split x into `x_`
-  if(is.numeric(x))
-  {
-    breaks <- sort(unlist(sapply(1:length(split), function(i) split[[i]]$node$split$breaks)))
-    x_ <- cut(x, breaks = unique(c(range(x, na.rm = T), breaks)), include.lowest = T, labels = F)
-    band <- paste(c('', breaks), c(breaks, ''), sep = ' ~ ')
-  }else if(is.ordered(x)){
-    breaks <- sort(unlist(sapply(1:length(split), function(i) split[[i]]$node$split$breaks)))
-    levels <- paste0("'", levels(x), "'")
-    breaks <- cut(1:length(levels), breaks = unique(c(0, length(levels), breaks)), labels = F)
-    band <- tapply(levels, breaks, paste0, collapse = ',')
-    x_ <- breaks[match(as.character(x), levels(x))]
+  }else{
+    #deal with the ctree result and create `band` and split x into `x_`
+    if(is.numeric(x))
+    {
+      breaks <- sort(unlist(sapply(1:length(split), function(i) split[[i]]$node$split$breaks)))
+      x_ <- cut(x, breaks = unique(c(range(x, na.rm = T), breaks)), include.lowest = T, labels = F)
+      band <- paste(c('', breaks), c(breaks, ''), sep = ' ~ ')
+    }else if(is.ordered(x)){
+      breaks <- sort(unlist(sapply(1:length(split), function(i) split[[i]]$node$split$breaks)))
+      levels <- paste0("'", levels(x), "'")
+      breaks <- cut(1:length(levels), breaks = unique(c(0, length(levels), breaks)), labels = F)
+      band <- tapply(levels, breaks, paste0, collapse = ',')
+      x_ <- breaks[match(as.character(x), levels(x))]
     }else{
-    levels <- paste0("'", levels(x), "'")
-    indexes <- unlist(sapply(1:length(split), function(i) split[[i]]$node$split$index))
-    indexes[is.na(indexes)] <- ''
-    indexes <- apply(matrix(indexes, ncol = length(levels), byrow = T), 2, paste0, collapse = '')
-    x_ <- indexes[match(x, levels(x))]
-    band <- tapply(levels, indexes, paste0, collapse = ',')
-    #delete the levels in which the frequency equals zero
-    #one reason is sampling which can reduce the frequency
-    band <- band[names(band) != '']
+      levels <- paste0("'", levels(x), "'")
+      indexes <- unlist(sapply(1:length(split), function(i) split[[i]]$node$split$index))
+      indexes[is.na(indexes)] <- ''
+      indexes <- apply(matrix(indexes, ncol = length(levels), byrow = T), 2, paste0, collapse = '')
+      x_ <- indexes[match(x, levels(x))]
+      band <- tapply(levels, indexes, paste0, collapse = ',')
+      #delete the levels in which the frequency equals zero
+      #one reason is sampling which can reduce the frequency
+      band <- band[names(band) != '']
+    }
+    if(any(is.na(x))) band <- c(band, 'missing')
   }
-  if(any(is.na(x))) band <- c(band, 'missing')
 
   #get the detail of split result
   splitResult <- table_matrix(x_, y, useNA = 'ifany')
@@ -62,7 +62,7 @@ splitLevel <- function(formula, df, minp = 0.05)
   splitResult[, band := band]
   setcolorder(splitResult, c('band', 'CntGood', 'CntBad'))
   mode <- ifelse(is.numeric(x) || is.ordered(x), 'J', 'A')
-  splitResult <- detail.woe(splitResult, mode)
+  detail <- detail.woe(splitResult, mode)
 
   #linearity
   is.linear <- TRUE
@@ -84,7 +84,7 @@ splitLevel <- function(formula, df, minp = 0.05)
                                             'mode'           = mode,
                                             'detail'         = '',
                                             stringsAsFactors = F),
-                     'detail' = splitResult,
+                     'detail' = detail,
                      'trace'  = NULL)
   class(WoE_result) <- 'woe.result'
   WoE_result

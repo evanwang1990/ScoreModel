@@ -4,16 +4,9 @@ using    namespace Rcpp;
 using    namespace std;
 
 double binary_split(NumericMatrix freqMatrix);
-//test:
-//tmp <- sample(20:100, 10, replace = T)
-//tmp <- matrix(c(tmp, round(tmp * (seq(1, 3, length.out = 10) + 0.5 * runif(1:10)) + sample(1:10, 10))), ncol = 2)
-//rownames(tmp) <- letters[1:10]
-//plot(tmp[,2]/tmp[,1])
-//trace <-Collapse(tmp, matrix(NA, ncol = 13, nrow = 10))
-
 
 //[[Rcpp::export]]
-NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_indx = 1, String method = "iv", String mode = "J")
+NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_indx = 1, String method = "max_iv", String mode = "J")
 {
   NumericVector good = freqMatrix.column(0);
   NumericVector bad  = freqMatrix.column(1);
@@ -43,8 +36,8 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
     for(size_t i = 0; i < n - 1; ++i)
     {
       delta_ = delta(good, bad, i, i + 1, method);
-      //when using method 'mo',if it's already monotonous
-      //or there's no levels to collapse use method 'iv'
+      //when using method 'linear',if it's already linear
+      //or there's no levels can be collapsed unsignificantly, use method 'max_iv'
       if(delta_ < min_delta)
       {
         min_delta = delta_;
@@ -70,7 +63,7 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
     }
   }
 
-  if(min_delta == 9999.0) return(Collapse(freqMatrix, trace, row_indx, "iv", "J"));
+  if(min_delta == 9999.0) return(Collapse(freqMatrix, trace, row_indx, "max_iv", "J"));
 
   //get new freqmatrix
   NumericMatrix freqMatrix_ = combine(freqMatrix, left, right);
@@ -90,7 +83,7 @@ NumericMatrix Collapse(NumericMatrix freqMatrix, NumericMatrix trace, int row_in
   trace(row_indx, 6)  = mode == "J" ? cal_c_stat(new_good, new_bad):NA_REAL;
   trace(row_indx, 5)  = n == 2 ? trace(row_indx, 6):cal_x_stat(new_good, new_bad);
   trace(row_indx, 7)  = mode == "J" ? (n == 2 ? 0:((trace(row_indx, 5) - trace(row_indx, 6)) / (trace(row_indx, 6) * (n - 2)))):NA_REAL;
-  trace(row_indx, 12) = method == "iv" ? 1:(method == "ll" ? 2:3);
+  trace(row_indx, 12) = method == "max_iv" ? 1:(method == "max_likehood" ? 2:3);
 
   if(n == 2) return(trace);
   return(Collapse(freqMatrix_, trace, ++ row_indx, method, mode));

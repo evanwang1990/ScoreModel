@@ -1,6 +1,51 @@
+#注意：missing nonmissing的情况
+#注意：变量长度太长时，需要截断加密，制作对应表map
+str_format <- function(str, ...)
+{
+  args <- as.list(unlist(list(...), recursive = T))
+  if (length(args) == 0) return(str)
+  if (is.null(names(args))) names(args) <- 1:length(args)
+  for (i in 1:length(args))
+  {
+    str <- gsub(paste0('#', names(args[i])), args[[i]], str)
+  }
+  str
+}
+
+`%+%` <- function(x, y)
+{
+  paste0(x, y)
+}
+
+#去掉最后一行！
+toSql <- function(varname, class, band, WoE)
+{
+  if ('nonmissing' %in% band)
+  {
+    condtions <- paste(varname, "is", ifelse(band == 'missing', '', 'not'), 'NULL')
+  }else if (class == 'numeric'){
+    breaks <- sapply(band[band != 'missing'], function(str) strsplit(str, ' ~ ', fixed = T)[[1]][1])
+    breaks <- breaks[!is.na(breaks)]
+    condtions <- paste(breaks, '<', varname, '<=', c(breaks[-1], ' '))
+    conditons[1] <- substring(condtions[1],3)
+    cond
+  }
+}
+save.woe <- function(WoE_result, ...) UseMethod('save.woe')
+
+save.woe.woe.result <- function(WoE_result, outfile)
+{
+  file_type <- sapply(outfile, function(str) unlist(strsplit(str, '.', fixed = TRUE))[2])
 
 
-注意：missing nonmissing的情况
+}
+
+
+
+
+
+
+
 
 stringCode <- function(x, y, x_, x_name, groups, SQLcode, method)
 {
@@ -45,4 +90,11 @@ stringCode <- function(x, y, x_, x_name, groups, SQLcode, method)
     return(c(code, sql_code))
   }
   return(code)
+}
+
+
+test <- function(str, ...)
+{
+  args <- unlist(...)
+  return(length(args[[1]]))
 }

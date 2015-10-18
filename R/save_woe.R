@@ -17,12 +17,13 @@ str_format <- function(str, ...)
   paste0(x, y)
 }
 
-#去掉最后一行！
-toSql <- function(varname, class, band, WoE)
+
+createConditions <- function(varname, class, band, type)
 {
   if ('nonmissing' %in% band)
   {
-    condtions <- paste(varname, "is", ifelse(band == 'missing', '', 'not'), 'NULL')
+    if (type == 'sql') condtions <- paste(varname, "is", ifelse(band == 'missing', '', 'not'), 'NULL')
+    else conditions <- paste(ifelse(band == 'missing', '', '~'), "missing(", varname, ")")
   }else if (class %in% c("numeric", "integer")){
     breaks <- sapply(band[band != 'missing'], function(str) strsplit(str, ' ~ ', fixed = T)[[1]][1])
     breaks <- breaks[!is.na(breaks)]
@@ -30,15 +31,28 @@ toSql <- function(varname, class, band, WoE)
     conditions[1] <- substring(conditions[1],4)
     conditions_last <- conditions[length(condtions)]
     conditions[length(conditions)] <- substr(conditions_last, 1, nchar(conditions_last) - 5)
-    if ('missing' %in% band) conditions <- c(conditions, paste(varname, "is NULL"))
+    if ('missing' %in% band) conditions <- c(conditions, ifelse(type == 'sql', paste(varname, "is NULL"), paste('missing(', varname, ')')))
   }else{
-    conditions <- paste(varname, "in c(", band[band != "missing"], ")")
-    if ("missing" %in% band) conditions <- c(conditions, paste("is NULL", varname))
+    conditions <- paste(varname, "in (", band[band != "missing"], ")")
+    if ("missing" %in% band) conditions <- c(conditions, ifelse(type == 'sql', paste(varname, "is NULL"), paste('missing(', varname, ')')))
   }
+  conditions
+}
 
+toSql <- function(varname, class, band, WoE)
+{
+  conditions <- createConditions(varname, class, band, 'sql')
   sql <- paste0(paste(c("case when", rep("     when", length(conditions) - 1)), conditions, "then", WoE, '\n'), collapse = '')
   sql <- paste0(sql, "     else 0\nend as W", varname, ',\n\n')
   sql
+}
+
+toSAS <- function(varname, class, band, WoE)
+{
+  conditions <- createConditions(varname, class, band, 'SAS')
+  SAS <- paste0(paste(c("     if", rep("else if", length(conditions) - 1)), conditions, "then", varname, "=", WoE, ";\n"), collapse = '')
+  SAS <- paste0(SAS, "else ", varname, " = 0 ;\n\n")
+  SAS
 }
 
 save.woe <- function(WoE_result, ...) UseMethod('save.woe')

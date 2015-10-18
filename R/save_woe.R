@@ -23,14 +23,24 @@ toSql <- function(varname, class, band, WoE)
   if ('nonmissing' %in% band)
   {
     condtions <- paste(varname, "is", ifelse(band == 'missing', '', 'not'), 'NULL')
-  }else if (class == 'numeric'){
+  }else if (class %in% c("numeric", "integer")){
     breaks <- sapply(band[band != 'missing'], function(str) strsplit(str, ' ~ ', fixed = T)[[1]][1])
     breaks <- breaks[!is.na(breaks)]
-    condtions <- paste(breaks, '<', varname, '<=', c(breaks[-1], ' '))
-    conditons[1] <- substring(condtions[1],3)
-    cond
+    conditions <- paste(breaks, '<', varname, '<=', c(breaks[-1], ' '))
+    conditions[1] <- substring(conditions[1],4)
+    conditions_last <- conditions[length(condtions)]
+    conditions[length(conditions)] <- substr(conditions_last, 1, nchar(conditions_last) - 5)
+    if ('missing' %in% band) conditions <- c(conditions, paste(varname, "is NULL"))
+  }else{
+    conditions <- paste(varname, "in c(", band[band != "missing"], ")")
+    if ("missing" %in% band) conditions <- c(conditions, paste("is NULL", varname))
   }
+
+  sql <- paste0(paste(c("case when", rep("     when", length(conditions) - 1)), conditions, "then", WoE, '\n'), collapse = '')
+  sql <- paste0(sql, "     else 0\nend as W", varname, ',\n\n')
+  sql
 }
+
 save.woe <- function(WoE_result, ...) UseMethod('save.woe')
 
 save.woe.woe.result <- function(WoE_result, outfile)

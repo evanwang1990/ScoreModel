@@ -75,9 +75,9 @@ splitLevel <- function(formula, df, minp = 0.05)
   WoE_result <- list('summary' = data.frame('var'            = all.vars(elem[[3]]), #elem[[3]] maybe 'factor(x)'
                                             'class'          = class(x),
                                             'PctNA'          = round(sum(is.na(x)) / length(x), 3),
-                                            'levels'         = nrow(splitResult) - 1 - any(is.na(x)),
-                                            'IV'             = max(splitResult$IV),
-                                            'IV_decrease'    = 0,
+                                            'levels'         = nrow(splitResult) - any(is.na(x)),
+                                            'IV'             = max(detail$IV),
+                                            'IV_decrease'    = ifelse(class(x) %in% c("character", "factor"), NA, 0),
                                             'is.linear'      = is.linear,
                                             'is.suboptional' = FALSE,
                                             'method'         = 'ctree',

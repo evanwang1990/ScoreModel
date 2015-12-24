@@ -10,16 +10,22 @@ chileancredit.train$Miss[FlagGB == 0] <- sample(c('a', rep(NA, 10)), sum(FlagGB 
 detach(chileancredit.train)
 
 #factor
-catLog(splitLevel(FlagGB ~ Performance, chileancredit.train))
-catLog(collapseLevel(FlagGB ~ Performance, chileancredit.train, method = "max_likehood"))
+splitWOE_factor <- splitLevel(FlagGB ~ Performance, chileancredit.train)
+catLog(splitWOE_factor)
+collapseWOE_factor <- collapseLevel(FlagGB ~ Performance, chileancredit.train, method = "max_likehood")
+catLog(collapseWOE_factor)
 
 #numeric
-catLog(splitLevel(FlagGB ~ TOB, chileancredit.train))
-catLog(collapseLevel(FlagGB ~ TOB, chileancredit.train, method = "max_likehood"))
+splitWOE_numeric <- splitLevel(FlagGB ~ TOB, chileancredit.train)
+catLog(splitWOE_numeric)
+collapseWOE_numeric <- collapseLevel(FlagGB ~ TOB, chileancredit.train, method = "max_likehood")
+catLog(collapseWOE_numeric)
 
 #one level with missing values
-catLog(splitLevel(FlagGB ~ Miss, chileancredit.train))
-catLog(collapseLevel(FlagGB ~ Miss, chileancredit.train))
+splitWOE_onelevel <- splitLevel(FlagGB ~ Miss, chileancredit.train)
+catLog(splitWOE_onelevel)
+collapseWOE_onelevel <- collapseLevel(FlagGB ~ Miss, chileancredit.train)
+catLog(collapseWOE_onelevel)
 
 
 tmp <- sample(20:100, 10, replace = T)
